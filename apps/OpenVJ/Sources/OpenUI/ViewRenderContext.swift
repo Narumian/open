@@ -1,5 +1,13 @@
 import Foundation
 
+/// Non-GPU export sink requested from `Output { }` stub leaves (encoder, file, broadcast).
+public enum StreamOutputKind: Sendable, Equatable {
+    case encodedVideo(preset: VideoEncodePreset)
+    case muxedBroadcast(endpointLabel: String)
+    case fileRecording(destinationLabel: String)
+    case rawSampleBuffer
+}
+
 /// Backend-neutral configuration for inter-app texture publish during tree walk.
 public struct InterAppPublishConfiguration: Sendable {
     public var serverName: String
@@ -26,6 +34,7 @@ public struct ViewRenderContext {
     private let applyInterAppPublish: (InterAppPublishConfiguration) -> Void
     private let applyInterAppSubscribe: (InterAppSubscribeConfiguration) -> Void
     private let applySourceBrowser: (SourceBrowserConfiguration) -> Void
+    private let applyStreamOutputStub: (StreamOutputKind) -> Void
 
     public init(
         frameTime: Float,
@@ -35,7 +44,8 @@ public struct ViewRenderContext {
         drawInterAppTextureInput: @escaping (String, Float) -> Void = { _, _ in },
         applyInterAppPublish: @escaping (InterAppPublishConfiguration) -> Void,
         applyInterAppSubscribe: @escaping (InterAppSubscribeConfiguration) -> Void = { _ in },
-        applySourceBrowser: @escaping (SourceBrowserConfiguration) -> Void = { _ in }
+        applySourceBrowser: @escaping (SourceBrowserConfiguration) -> Void = { _ in },
+        applyStreamOutputStub: @escaping (StreamOutputKind) -> Void = { _ in }
     ) {
         self.frameTime = frameTime
         blendLayerIndex = 0
@@ -47,6 +57,7 @@ public struct ViewRenderContext {
         self.applyInterAppPublish = applyInterAppPublish
         self.applyInterAppSubscribe = applyInterAppSubscribe
         self.applySourceBrowser = applySourceBrowser
+        self.applyStreamOutputStub = applyStreamOutputStub
     }
 
     private mutating func nextBlendLayerAlpha() -> Float {
@@ -73,9 +84,14 @@ public struct ViewRenderContext {
         savedBlendLayerIndex = nil
     }
 
-    /// Called by the `InterAppTexture` view leaf during tree walk.
-    public mutating func requestInterAppPublish(serverName: String, enabled: Bool = true) {
+    /// Called by `InterAppTextureOutput` during tree walk.
+    public mutating func requestInterAppTextureOutput(serverName: String, enabled: Bool = true) {
         applyInterAppPublish(InterAppPublishConfiguration(serverName: serverName, enabled: enabled))
+    }
+
+    /// Stub stream outputs (`EncodedStream`, `FileRecording`, …) inside `Output { }`.
+    public mutating func registerStreamOutput(_ kind: StreamOutputKind) {
+        applyStreamOutputStub(kind)
     }
 
     /// Called by `InterAppTextureInput` during tree walk.
@@ -120,8 +136,8 @@ public struct ViewRenderContext {
             drawGenerativeShader()
         case .waveBody(let mode, let explicitTime):
             drawWaveBody(mode: mode, time: explicitTime)
-        case .interAppPublish(let serverName):
-            requestInterAppPublish(serverName: serverName)
+        case .interAppTextureOutput(let serverName):
+            requestInterAppTextureOutput(serverName: serverName)
         case .interAppSubscribe(let serverName):
             drawInterAppTextureInput(serverName: serverName)
         case .video(let fileURLString):
@@ -148,6 +164,18 @@ public struct ViewRenderContext {
                 render(node: child)
             }
             endEqualWeightMix()
+        case .encodedStream(let preset):
+            registerStreamOutput(.encodedVideo(preset: preset))
+        case .muxedBroadcast(let endpointLabel):
+            registerStreamOutput(.muxedBroadcast(endpointLabel: endpointLabel))
+        case .fileRecording(let destinationLabel):
+            registerStreamOutput(.fileRecording(destinationLabel: destinationLabel))
+        case .rawSampleBuffer:
+            registerStreamOutput(.rawSampleBuffer)
+        case .output(let children):
+            for child in children {
+                render(node: child)
+            }
         }
     }
 }

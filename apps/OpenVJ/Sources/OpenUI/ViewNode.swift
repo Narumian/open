@@ -5,8 +5,14 @@ public enum ViewNode: Equatable, Sendable {
     case empty
     case generativeShader
     case waveBody(WaveMode, explicitTime: Float?)
-    case interAppPublish(serverName: String)
+    case interAppTextureOutput(serverName: String)
     case interAppSubscribe(serverName: String)
+    case encodedStream(preset: VideoEncodePreset)
+    case muxedBroadcast(endpointLabel: String)
+    case fileRecording(destinationLabel: String)
+    case rawSampleBuffer
+    /// Export sink group (`Output { … }`); children do not draw.
+    case output([ViewNode])
     case video(fileURL: String)
     /// Source picker leaf (draws from `SourceBrowserState` during walk).
     case sourceBrowser

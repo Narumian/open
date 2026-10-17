@@ -14,55 +14,119 @@ public struct InterAppTextureInputServer: Sendable, Equatable {
 
 /// Shared GPU frame bus for sending visuals to other macOS apps (optional platform backends).
 public enum InterAppTextureRegistry {
-    public typealias PublisherFactory = (_ configuration: PublisherConfiguration) -> InterAppTexturePublisher?
-    public typealias SubscriberFactory = (_ configuration: SubscriberConfiguration) -> InterAppTextureSubscriber?
-    public typealias InputServerDiscovery = () -> [InterAppTextureInputServer]
+    /// Publish-side registry (`InterAppTextureOutput` → `InterAppTexturePublisher`).
+    public enum Output {
+        public typealias Factory = (_ configuration: PublisherConfiguration) -> InterAppTexturePublisher?
 
-    public static let inputServersDidChangeNotification = Notification.Name("InterAppTextureRegistry.inputServersDidChange")
+        public static func registerFactory(_ factory: @escaping Factory) {
+            publisherFactory = factory
+        }
 
-    private static var publisherFactory: PublisherFactory?
-    private static var subscriberFactory: SubscriberFactory?
-    private static var inputServerDiscovery: InputServerDiscovery?
+        public static func makePublisher(configuration: PublisherConfiguration) -> InterAppTexturePublisher? {
+            publisherFactory?(configuration)
+        }
 
-    /// Register a platform publish backend. Called from optional inter-app modules at load time.
+        public static var isBackendRegistered: Bool { publisherFactory != nil }
+    }
+
+    /// Subscribe-side registry (`InterAppTextureInput` → `InterAppTextureSubscriber` + discovery).
+    public enum Input {
+        public typealias SubscriberFactory = (_ configuration: SubscriberConfiguration) -> InterAppTextureSubscriber?
+        public typealias ServerDiscovery = () -> [InterAppTextureInputServer]
+
+        public static let serversDidChangeNotification = Notification.Name(
+            "InterAppTextureRegistry.inputServersDidChange"
+        )
+
+        public static func registerSubscriberFactory(_ factory: @escaping SubscriberFactory) {
+            subscriberFactory = factory
+        }
+
+        public static func registerServerDiscovery(_ discovery: @escaping ServerDiscovery) {
+            serverDiscovery = discovery
+        }
+
+        public static func availableServers() -> [InterAppTextureInputServer] {
+            serverDiscovery?() ?? []
+        }
+
+        public static func availableServerNames() -> [String] {
+            availableServers().map(\.serverName)
+        }
+
+        public static func notifyServersDidChange() {
+            NotificationCenter.default.post(name: serversDidChangeNotification, object: nil)
+        }
+
+        public static func makeSubscriber(configuration: SubscriberConfiguration) -> InterAppTextureSubscriber? {
+            subscriberFactory?(configuration)
+        }
+
+        public static var isBackendRegistered: Bool { subscriberFactory != nil }
+    }
+
+    private static var publisherFactory: Output.Factory?
+    private static var subscriberFactory: Input.SubscriberFactory?
+    private static var serverDiscovery: Input.ServerDiscovery?
+
+    // MARK: - Legacy flat API (forwards to nested namespaces)
+
+    public typealias PublisherFactory = Output.Factory
+    public typealias SubscriberFactory = Input.SubscriberFactory
+    public typealias InputServerDiscovery = Input.ServerDiscovery
+
+    public static let inputServersDidChangeNotification = Input.serversDidChangeNotification
+
+    @available(*, deprecated, renamed: "InterAppTextureRegistry.Output.registerFactory")
     public static func registerPublisherFactory(_ factory: @escaping PublisherFactory) {
-        publisherFactory = factory
+        Output.registerFactory(factory)
     }
 
-    /// Register a platform subscribe backend. Called from optional inter-app modules at load time.
+    @available(*, deprecated, renamed: "InterAppTextureRegistry.Input.registerSubscriberFactory")
     public static func registerSubscriberFactory(_ factory: @escaping SubscriberFactory) {
-        subscriberFactory = factory
+        Input.registerSubscriberFactory(factory)
     }
 
-    /// Register discovery for remote input servers (source browser, etc.).
+    @available(*, deprecated, renamed: "InterAppTextureRegistry.Input.registerServerDiscovery")
     public static func registerInputServerDiscovery(_ discovery: @escaping InputServerDiscovery) {
-        inputServerDiscovery = discovery
+        Input.registerServerDiscovery(discovery)
     }
 
+    @available(*, deprecated, renamed: "InterAppTextureRegistry.Input.availableServers")
     public static func availableInputServers() -> [InterAppTextureInputServer] {
-        inputServerDiscovery?() ?? []
+        Input.availableServers()
     }
 
+    @available(*, deprecated, renamed: "InterAppTextureRegistry.Input.availableServerNames")
     public static func availableInputServerNames() -> [String] {
-        availableInputServers().map(\.serverName)
+        Input.availableServerNames()
     }
 
+    @available(*, deprecated, renamed: "InterAppTextureRegistry.Input.notifyServersDidChange")
     public static func notifyInputServersDidChange() {
-        NotificationCenter.default.post(name: inputServersDidChangeNotification, object: nil)
+        Input.notifyServersDidChange()
     }
 
+    @available(*, deprecated, renamed: "InterAppTextureRegistry.Output.makePublisher")
     public static func makePublisher(configuration: PublisherConfiguration) -> InterAppTexturePublisher? {
-        publisherFactory?(configuration)
+        Output.makePublisher(configuration: configuration)
     }
 
+    @available(*, deprecated, renamed: "InterAppTextureRegistry.Input.makeSubscriber")
     public static func makeSubscriber(configuration: SubscriberConfiguration) -> InterAppTextureSubscriber? {
-        subscriberFactory?(configuration)
+        Input.makeSubscriber(configuration: configuration)
     }
 
-    public static var isPublisherBackendRegistered: Bool { publisherFactory != nil }
-    public static var isSubscriberBackendRegistered: Bool { subscriberFactory != nil }
+    public static var isPublisherBackendRegistered: Bool { Output.isBackendRegistered }
+    public static var isSubscriberBackendRegistered: Bool { Input.isBackendRegistered }
     public static var isBackendRegistered: Bool { isPublisherBackendRegistered }
 }
+
+/// Publish-side registry alias.
+public typealias InterAppTextureOutputRegistry = InterAppTextureRegistry.Output
+
+/// Subscribe-side registry alias.
+public typealias InterAppTextureInputRegistry = InterAppTextureRegistry.Input
 
 public struct PublisherConfiguration: Sendable {
     public var serverName: String

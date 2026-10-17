@@ -1,34 +1,34 @@
 # Inter-app texture (Syphon-first)
 
-**Invariant: Syphon is only an implementation of `InterAppTexture`; never touch Syphon directly in OpenUI, scenes, or public API.**
+**Invariant: Syphon is only an implementation of the inter-app texture API (`InterAppTextureOutput` / `InterAppTextureInput`); never touch Syphon directly in OpenUI, scenes, or public API.**
 
-OpenVJ exchanges GPU frames with other macOS apps through a **backend-agnostic** API in `OpenVJ`. The **OpenUI** surface is always `InterAppTexture*` types — Syphon lives only inside the optional `OpenVJSyphon` module.
+OpenVJ exchanges GPU frames with other macOS apps through a **backend-agnostic** API in `OpenVJ`. The **OpenUI** surface is always `InterAppTextureOutput` / `InterAppTextureInput` — Syphon lives only inside the optional `OpenVJSyphon` module.
 
 ## Strategy
 
 1. **Ship on macOS with Syphon** — WGPU → Metal ↔ Syphon publish and subscribe in production VJ tools (Resolume, VDMX).
-2. **Keep the abstraction** — `InterAppTextureRegistry` factories + `InterAppTexturePublisher` / `InterAppTextureSubscriber` are the stable seam.
+2. **Keep the abstraction** — `InterAppTextureRegistry.Output` / `.Input` factories + `InterAppTexturePublisher` / `InterAppTextureSubscriber` are the stable seam.
 3. **Port later** — Windows Spout, LAN NDI, etc. become additional factories, not scene-graph changes.
 
 ## Architecture
 
 | Layer | Responsibility |
 |-------|----------------|
-| `OpenUI` | `InterAppTexture` (publish), `InterAppTextureInput` / `InterAppTexture.subscribe` (receive) |
+| `OpenUI` | `InterAppTextureOutput` (publish), `InterAppTextureInput` (receive) |
 | `OpenVJ` | Registry, `WGPUVisualRenderer` copy + publish, `WGPUInterAppTextureInputState` import + draw |
 | `OpenVJSyphon` | **Only module that imports Syphon SDK** — `SyphonInterAppTexturePublisher`, `SyphonInterAppTextureSubscriber` |
 | `OpenVJApp` | Calls `openVJSyphonBootstrap()` on render start when linked; optional menu kill switch |
 
 ### Publish path (out)
 
-1. `InterAppTexture("name")` in the view tree → `InterAppTextureRegistry.makePublisher` (no manual Syphon wiring).
+1. `InterAppTextureOutput("name")` in the view tree → `InterAppTextureRegistry.Output.makePublisher` (no manual Syphon wiring).
 2. Render scene to swapchain (BGRA8, `CopySrc`).
 3. GPU `copyTextureToTexture` → internal buffer → `SyphonMetalServer.publishFrameTexture` (when clients connected).
 
 ### Subscribe path (in)
 
-1. `InterAppTextureInput("ServerName")` or `InterAppTexture.subscribe("ServerName")` in `Add` / `Mixer`.
-2. `InterAppTextureRegistry.makeSubscriber` → `SyphonMetalClient` on the shared wgpu Metal device.
+1. `InterAppTextureInput("ServerName")` in `Add` / `Mixer`.
+2. `InterAppTextureRegistry.Input.makeSubscriber` → `SyphonMetalClient` on the shared wgpu Metal device.
 3. Each frame: Metal blit from Syphon `MTLTexture` into a WGPU BGRA8 texture, sampled like `Video`.
 
 `openVJSyphonBootstrap()` registers **both** publisher and subscriber factories. `OpenVJApp` invokes it automatically when `OpenVJSyphon` is linked.
@@ -38,17 +38,15 @@ OpenVJ exchanges GPU frames with other macOS apps through a **backend-agnostic**
 Publish + draw:
 
 ```swift
-Add {
-    InterAppTexture("OpenVJ")
-    SomeVisual()
-}
+Output { InterAppTextureOutput("OpenVJ") }
+Add { SomeVisual() }
 ```
 
 Publish + equal-weight mix:
 
 ```swift
+Output { InterAppTextureOutput("OpenVJ") }
 Add {
-    InterAppTexture("OpenVJ")
     Mixer {
         SinBody()
         Video(path: "/path/to/clip.mov")
@@ -59,11 +57,11 @@ Add {
 Subscribe + mix a remote inter-app source with local generative output:
 
 ```swift
+Output { InterAppTextureOutput("OpenVJ") }
 Add {
-    InterAppTexture("OpenVJ")
     Mixer {
         SinBody()
-        InterAppTexture.subscribe("OtherApp")
+        InterAppTextureInput("OtherApp")
     }
 }
 ```
@@ -77,9 +75,21 @@ Built-in scenes (`OpenUI`):
 | `OpenVJLiveVideoScene(path:)` | Publish + `Video` in `Mixer` |
 | `OpenVJInterAppTextureScene` | Minimal publish demo |
 
-When `OPEN_VJ_INTER_APP_PUBLISH=1` (or legacy `OPEN_VJ_SYPHON=1`) or View → **Publish Inter-App Texture** was on at last launch, `OpenVJApp` selects `OpenVJLiveScene()` as `rootView`. Publish still works from any scene that includes `InterAppTexture` once an inter-app backend is linked.
+When `OPEN_VJ_INTER_APP_PUBLISH=1` (or legacy `OPEN_VJ_SYPHON=1`) or View → **Publish Inter-App Texture** was on at last launch, `OpenVJApp` selects `OpenVJLiveScene()` as `rootView`. Publish still works from any scene that includes `InterAppTextureOutput` once an inter-app backend is linked.
 
-Source discovery for the macOS source browser uses `InterAppTextureRegistry.availableInputServers()` / `availableInputServerNames()` — not Syphon APIs in OpenUI or `OpenVJApp`.
+Source discovery for the macOS source browser uses `InterAppTextureRegistry.Input.availableServers()` / `availableServerNames()` — not Syphon APIs in OpenUI or `OpenVJApp`.
+
+## Migration
+
+| Before | After |
+|--------|-------|
+| `InterAppTexture("name")` | `Output { InterAppTextureOutput("name") }` |
+| `InterAppTexture.subscribe("name")` | `InterAppTextureInput("name")` or `InterAppTextureInput.subscribe("name")` |
+| `InterAppTextureRegistry.makePublisher` | `InterAppTextureRegistry.Output.makePublisher` |
+| `InterAppTextureRegistry.makeSubscriber` | `InterAppTextureRegistry.Input.makeSubscriber` |
+| `InterAppTextureRegistry.availableInputServers()` | `InterAppTextureRegistry.Input.availableServers()` |
+
+Aliases: `InterAppTextureOutputRegistry`, `InterAppTextureInputRegistry`.
 
 ## Backends
 
@@ -89,7 +99,7 @@ Source discovery for the macOS source browser uses `InterAppTextureRegistry.avai
 | **Spout** | Windows | Planned | Planned |
 | **NDI** | Cross-platform | Planned | Planned |
 
-Register factories with `InterAppTextureRegistry.registerPublisherFactory` / `registerSubscriberFactory` from optional targets (same pattern as `openVJSyphonBootstrap()`).
+Register factories with `InterAppTextureRegistry.Output.registerFactory` / `InterAppTextureRegistry.Input.registerSubscriberFactory` from optional targets (same pattern as `openVJSyphonBootstrap()`).
 
 ## Developer setup (Syphon)
 
@@ -107,5 +117,5 @@ See also [apps/OpenVJ/README.md](../apps/OpenVJ/README.md).
 
 ## Verify in other apps
 
-- **Resolume Arena:** Sources → Syphon → **OpenVJ** (scene must include `InterAppTexture("OpenVJ")`).
+- **Resolume Arena:** Sources → Syphon → **OpenVJ** (scene must include `InterAppTextureOutput("OpenVJ")`).
 - **VDMX:** Syphon Input → server **OpenVJ**.

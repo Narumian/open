@@ -25,8 +25,9 @@ extension InterAppTextureInput: ViewRepresentable {
     var viewNode: ViewNode { .interAppSubscribe(serverName: serverName) }
 }
 
-extension InterAppTexture {
-    /// Factory for an incoming inter-app texture layer subscribed to `serverName`.
+extension InterAppTextureOutput {
+    /// Prefer `InterAppTextureInput("name")`.
+    @available(*, deprecated, renamed: "InterAppTextureInput")
     public static func subscribe(_ serverName: String) -> InterAppTextureInput {
         InterAppTextureInput(serverName)
     }
@@ -40,12 +41,14 @@ public struct OpenVJInterAppMixScene: View {
         self.remoteServerName = remoteServerName
     }
 
-    public var body: Add<TupleView2<InterAppTexture, Mixer<TupleView2<SinBody, InterAppTextureInput>>>> {
+    public var body: Add<TupleView2<Output<InterAppTextureOutput>, Mixer<TupleView2<SinBody, InterAppTextureInput>>>> {
         Add {
-            InterAppTexture("OpenVJ")
+            Output {
+                InterAppTextureOutput("OpenVJ")
+            }
             Mixer {
                 SinBody()
-                InterAppTexture.subscribe(remoteServerName)
+                InterAppTextureInput(remoteServerName)
             }
         }
     }

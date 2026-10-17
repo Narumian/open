@@ -26,7 +26,7 @@ final class SourceBrowserController: NSObject, NSWindowDelegate {
             }
         }
         inputServersObserver = NotificationCenter.default.addObserver(
-            forName: InterAppTextureRegistry.inputServersDidChangeNotification,
+            forName: InterAppTextureRegistry.Input.serversDidChangeNotification,
             object: nil,
             queue: .main
         ) { [weak self] _ in
@@ -191,7 +191,7 @@ final class SourceBrowserController: NSObject, NSWindowDelegate {
             }
         }
 
-        for entry in InterAppTextureRegistry.availableInputServers() {
+        for entry in InterAppTextureRegistry.Input.availableServers() {
             next.append(.interAppServer(name: entry.serverName, displayName: entry.displayName))
         }
 

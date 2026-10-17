@@ -38,13 +38,15 @@ Generative content is described with the **`OpenUI`** module: a SwiftUI-free **`
 | `GroupView` | Transparent container for builder content |
 | `EmptyView` | No-op leaf |
 | `AnyView` | Type erasure for renderer storage |
-| `InterAppTexture` | Leaf: request inter-app publish (`InterAppTexture("OpenVJ")`) — no draw |
+| `Output` | Groups export sinks (`InterAppTextureOutput`, stubs) — no draw |
+| `InterAppTextureOutput` | Leaf: inter-app GPU texture publish (`InterAppTextureOutput("OpenVJ")`) |
+| `InterAppTextureInput` | Leaf: draw remote inter-app server as a layer |
 | `SomeVisual` / `Some` | Demo sin wave leaf (`typealias Some = SomeVisual`) |
 | `SourceBrowser` | Leaf: macOS source picker + draws selected file / inter-app input |
 | `OpenVJSourceBrowserMixerScene` | `Mixer { SourceBrowser(); Some() }` example |
 | `OpenVJDefaultScene` | Built-in root scene (`Add { SinBody(); TanBody().time(...) }`) |
-| `OpenVJInterAppTextureScene` | `Add { InterAppTexture("OpenVJ"); SomeVisual() }` |
-| `OpenVJLiveScene` | `Add { InterAppTexture("OpenVJ"); Mixer { SinBody(); TanBody() } }` — used when inter-app publish is on at launch |
+| `OpenVJInterAppTextureScene` | `Output { InterAppTextureOutput("OpenVJ") }` + `SomeVisual()` |
+| `OpenVJLiveScene` | `Output { … }` + `Mixer { SinBody(); TanBody() }` — used when inter-app publish is on at launch |
 | `OpenVJLiveVideoScene` | Publish + `Mixer { SinBody(); Video(path:) }` |
 | `OpenVJTimedDemoScene` | Same stack with an explicit `time` parameter |
 | `ViewSceneHosting` | `VisualRenderer` + `rootView` (`WGPUVisualRenderer`) |
@@ -95,8 +97,10 @@ Assign `AnyView(OpenVJVideoScene(videoAt: url))` on `WGPUVisualRenderer.rootView
 Inter-app publish from the scene graph (backend-agnostic; macOS Syphon when `OpenVJSyphon` is linked):
 
 ```swift
+Output {
+    InterAppTextureOutput("OpenVJ")
+}
 Add {
-    InterAppTexture("OpenVJ")
     Mixer {
         SinBody()
         Video(path: "/path/to/clip.mov")
@@ -104,18 +108,18 @@ Add {
 }
 ```
 
-During tree walk, `InterAppTexture` configures `InterAppTexturePublisher` via `InterAppTextureRegistry.makePublisher(configuration:)` — OpenUI never imports Syphon. `OpenVJApp` bootstraps the optional backend when rendering starts. Without a linked backend, publish is a no-op and OpenVJ logs once.
+During tree walk, `InterAppTextureOutput` configures `InterAppTexturePublisher` via `InterAppTextureRegistry.makePublisher(configuration:)` — OpenUI never imports Syphon. `OpenVJApp` bootstraps the optional backend when rendering starts. Without a linked backend, publish is a no-op and OpenVJ logs once.
 
 Subscribe from another app’s inter-app server:
 
 ```swift
 Mixer {
     SinBody()
-    InterAppTexture.subscribe("OtherApp")
+    InterAppTextureInput.subscribe("OtherApp")
 }
 ```
 
-Syphon-first roadmap and future Spout/NDI backends: [docs/inter-app-texture.md](../../docs/inter-app-texture.md).
+Output stream kinds (implemented vs stub): [docs/output-streams.md](../../docs/output-streams.md). Syphon-first inter-app bus: [docs/inter-app-texture.md](../../docs/inter-app-texture.md).
 
 `WGPUVisualRenderer.rootView` is traversed each frame; assign `AnyView(yourScene)` on a `ViewSceneHosting` renderer to swap scenes without touching the AppKit shell.
 

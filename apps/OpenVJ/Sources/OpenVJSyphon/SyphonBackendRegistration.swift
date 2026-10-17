@@ -9,19 +9,19 @@ public enum SyphonBackendRegistration {
 
     public static func registerIfNeeded() {
         if !didRegisterPublisher {
-            InterAppTextureRegistry.registerPublisherFactory { configuration in
+            InterAppTextureRegistry.Output.registerFactory { configuration in
                 SyphonInterAppTexturePublisher(configuration: configuration)
             }
             didRegisterPublisher = true
         }
         if !didRegisterSubscriber {
-            InterAppTextureRegistry.registerSubscriberFactory { configuration in
+            InterAppTextureRegistry.Input.registerSubscriberFactory { configuration in
                 SyphonInterAppTextureSubscriber(configuration: configuration)
             }
             didRegisterSubscriber = true
         }
         if !didRegisterDiscovery {
-            InterAppTextureRegistry.registerInputServerDiscovery {
+            InterAppTextureRegistry.Input.registerServerDiscovery {
                 SyphonServerListing.inputServers()
             }
             let center = NotificationCenter.default
@@ -30,7 +30,7 @@ public enum SyphonBackendRegistration {
                 object: nil,
                 queue: .main
             ) { _ in
-                InterAppTextureRegistry.notifyInputServersDidChange()
+                InterAppTextureRegistry.Input.notifyServersDidChange()
             }
             didRegisterDiscovery = true
         }

@@ -58,7 +58,7 @@ final class WGPUInterAppTextureInputState {
             return
         }
 
-        if let subscriber = InterAppTextureRegistry.makeSubscriber(configuration: configuration) {
+        if let subscriber = InterAppTextureRegistry.Input.makeSubscriber(configuration: configuration) {
             subscriber.attach(device: device, queue: queue)
             try? subscriber.start()
             subscribers[key] = subscriber

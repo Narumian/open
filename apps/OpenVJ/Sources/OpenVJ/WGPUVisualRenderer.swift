@@ -27,8 +27,9 @@ public final class WGPUVisualRenderer: VisualRenderer {
     private var videoRenderState: WGPUVideoRenderState?
     private var interAppInputState: WGPUInterAppTextureInputState?
     private static var didLogMissingInterAppBackend = false
+    private static var loggedStreamOutputStubs: Set<String> = []
 
-    /// When true, `InterAppTexture` publish leaves in the scene graph are ignored (menu kill switch).
+    /// When true, `InterAppTextureOutput` publish leaves in the scene graph are ignored (menu kill switch).
     public var sceneInterAppPublishSuppressed = false
 
     /// Optional inter-app publisher (when a backend is registered). Off by default on the publisher itself.
@@ -137,7 +138,7 @@ public final class WGPUVisualRenderer: VisualRenderer {
         interAppInputState?.applySubscribeConfiguration(configuration)
     }
 
-    /// Applies `InterAppTexture` visual leaf configuration for the current frame.
+    /// Applies `InterAppTextureOutput` visual leaf configuration for the current frame.
     func applyInterAppPublishConfiguration(_ configuration: PublisherConfiguration) {
         if sceneInterAppPublishSuppressed {
             if interAppPublisher != nil {
@@ -302,6 +303,9 @@ public final class WGPUVisualRenderer: VisualRenderer {
                     applyInterAppSubscribeConfiguration(
                         SubscriberConfiguration(serverName: configuration.serverName)
                     )
+                },
+                applyStreamOutputStub: { kind in
+                    Self.logStreamOutputStubOnce(kind)
                 }
             )
             rootView.render(in: &visualContext)
@@ -358,6 +362,23 @@ public final class WGPUVisualRenderer: VisualRenderer {
         interAppCopyTexture = wgpuDeviceCreateTexture(device, &descriptor)
         interAppCopyWidth = width
         interAppCopyHeight = height
+    }
+
+    private static func logStreamOutputStubOnce(_ kind: StreamOutputKind) {
+        let key: String
+        switch kind {
+        case .encodedVideo(let preset):
+            key = "encodedVideo:\(preset.rawValue)"
+        case .muxedBroadcast(let label):
+            key = "muxedBroadcast:\(label)"
+        case .fileRecording(let label):
+            key = "fileRecording:\(label)"
+        case .rawSampleBuffer:
+            key = "rawSampleBuffer"
+        }
+        guard !loggedStreamOutputStubs.contains(key) else { return }
+        loggedStreamOutputStubs.insert(key)
+        fputs("[OpenVJ] Stream output stub registered (\(key)); backend not implemented yet.\n", stderr)
     }
 
     private func releaseInterAppCopyTexture() {
