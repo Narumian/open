@@ -56,3 +56,39 @@ public struct OpenVJInterAppTextureScene: View {
         }
     }
 }
+
+/// Default live-output scene when Syphon is enabled: publish + equal-weight mix of generative layers.
+///
+/// Assign on `ViewSceneHosting.rootView`, or let `OpenVJApp` pick it when `OPEN_VJ_SYPHON=1` / menu is on.
+public struct OpenVJLiveScene: View {
+    public init() {}
+
+    public var body: Add<TupleView2<InterAppTexture, Mixer<TupleView2<SinBody, TanBody>>>> {
+        Add {
+            InterAppTexture("OpenVJ")
+            Mixer {
+                SinBody()
+                TanBody().time(OpenVJSceneTime.current)
+            }
+        }
+    }
+}
+
+/// Live scene with a local video file mixed under the same Syphon server name.
+public struct OpenVJLiveVideoScene: View {
+    public let videoPath: String
+
+    public init(path: String) {
+        videoPath = path
+    }
+
+    public var body: Add<TupleView2<InterAppTexture, Mixer<TupleView2<SinBody, Video>>>> {
+        Add {
+            InterAppTexture("OpenVJ")
+            Mixer {
+                SinBody()
+                Video(path: videoPath)
+            }
+        }
+    }
+}

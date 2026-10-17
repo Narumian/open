@@ -1,4 +1,5 @@
 import AppKit
+import OpenUI
 import OpenVJ
 import QuartzCore
 
@@ -57,6 +58,9 @@ final class VisualView: NSView {
         }
         self.renderer = renderer
         interAppController.renderer = renderer
+        if InterAppTextureSettings.syphonRequestedAtLaunch, let wgpu = renderer as? WGPUVisualRenderer {
+            wgpu.rootView = AnyView(OpenVJLiveScene())
+        }
         interAppController.bootstrapIfNeeded()
         updateDrawableSize()
 
@@ -94,6 +98,9 @@ final class VisualView: NSView {
     }
 
     func setInterAppPublishing(_ enabled: Bool) {
+        if let wgpu = renderer as? WGPUVisualRenderer {
+            wgpu.sceneInterAppPublishSuppressed = !enabled
+        }
         interAppController.setPublishing(enabled: enabled)
     }
 

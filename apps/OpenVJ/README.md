@@ -42,6 +42,8 @@ Generative content is described with the **`OpenUI`** module: a SwiftUI-free **`
 | `SomeVisual` | Demo sin wave leaf for publish examples |
 | `OpenVJDefaultScene` | Built-in root scene (`Add { SinBody(); TanBody().time(...) }`) |
 | `OpenVJInterAppTextureScene` | `Add { InterAppTexture("OpenVJ"); SomeVisual() }` |
+| `OpenVJLiveScene` | `Add { InterAppTexture("OpenVJ"); Mixer { SinBody(); TanBody() } }` — used when Syphon is on at launch |
+| `OpenVJLiveVideoScene` | Publish + `Mixer { SinBody(); Video(path:) }` |
 | `OpenVJTimedDemoScene` | Same stack with an explicit `time` parameter |
 | `ViewSceneHosting` | `VisualRenderer` + `rootView` (`WGPUVisualRenderer`) |
 
@@ -93,11 +95,16 @@ Inter-app publish from the scene graph (backend-agnostic; Syphon only when `Open
 ```swift
 Add {
     InterAppTexture("OpenVJ")
-    SomeVisual()
+    Mixer {
+        SinBody()
+        Video(path: "/path/to/clip.mov")
+    }
 }
 ```
 
 During tree walk, `InterAppTexture` configures `InterAppTexturePublisher` via `InterAppTextureRegistry.makePublisher(configuration:)` — the renderer does not call Syphon directly. Without a linked backend, publish is a no-op and OpenVJ logs once.
+
+Syphon-first roadmap and future Spout/NDI backends: [docs/inter-app-texture.md](../../docs/inter-app-texture.md).
 
 `WGPUVisualRenderer.rootView` is traversed each frame; assign `AnyView(yourScene)` on a `ViewSceneHosting` renderer to swap scenes without touching the AppKit shell.
 
@@ -142,10 +149,12 @@ OpenVJ exposes inter-app texture sharing in the `OpenVJ` library:
 
 2. Turn publishing on:
 
-   - **Environment:** `OPEN_VJ_SYPHON=1 .build/debug/OpenVJApp`
+   - **Environment:** `OPEN_VJ_SYPHON=1 .build/debug/OpenVJApp` (also selects `OpenVJLiveScene` at startup)
    - **Menu:** View → **Publish to Syphon** (persists in UserDefaults)
 
 Other apps see a server named **OpenVJ** in Syphon clients (e.g. VDMX, Resolume).
+
+**Resolume:** Sources → Syphon → **OpenVJ**. **VDMX:** Syphon Input → server **OpenVJ**.
 
 ### WGPU → Syphon bridge (constraints)
 

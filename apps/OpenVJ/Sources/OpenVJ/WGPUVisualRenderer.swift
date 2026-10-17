@@ -27,6 +27,9 @@ public final class WGPUVisualRenderer: VisualRenderer {
     private var videoRenderState: WGPUVideoRenderState?
     private static var didLogMissingInterAppBackend = false
 
+    /// When true, `InterAppTexture` leaves in the scene graph do not configure a publisher (app menu / env gate).
+    public var sceneInterAppPublishSuppressed = false
+
     /// Optional inter-app publisher (Syphon when `OpenVJSyphon` is linked). Off by default on the publisher itself.
     public var interAppPublisher: InterAppTexturePublisher?
 
@@ -130,6 +133,13 @@ public final class WGPUVisualRenderer: VisualRenderer {
 
     /// Applies `InterAppTexture` visual leaf configuration for the current frame.
     func applyInterAppPublishConfiguration(_ configuration: PublisherConfiguration) {
+        if sceneInterAppPublishSuppressed {
+            if interAppPublisher != nil {
+                setInterAppPublisher(nil)
+            }
+            return
+        }
+
         guard configuration.enabled else {
             setInterAppPublisher(nil)
             return
@@ -316,7 +326,8 @@ public final class WGPUVisualRenderer: VisualRenderer {
 
         releaseInterAppCopyTexture()
         var descriptor = WGPUTextureDescriptor()
-        descriptor.usage = WGPUTextureUsage_CopyDst | WGPUTextureUsage_TextureBinding
+        descriptor.usage =
+            WGPUTextureUsage_CopyDst | WGPUTextureUsage_TextureBinding | WGPUTextureUsage_CopySrc
         descriptor.dimension = WGPUTextureDimension_2D
         descriptor.size = WGPUExtent3D(width: width, height: height, depthOrArrayLayers: 1)
         descriptor.format = Self.surfaceFormat
