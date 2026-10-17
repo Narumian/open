@@ -35,8 +35,8 @@ Generative content is described with the **`OpenUI`** module: a SwiftUI-free **`
 | `TanBody.time(_:)` | Pin tan warp time (`Float` or `CFTimeInterval`) |
 | `OpenVJSceneTime.current` | Frame time written by the renderer (for `.time(...)` at call site) |
 | `ShaderView` | Legacy full-screen generative WGSL leaf |
-| `Video` | Local file video leaf (AVFoundation → WGPU texture) |
-| `OpenVJVideoScene` | `Add { Video(...); SinBody() }` example |
+| `Video` | Local file URL leaf (`init(path:)`, `init(url:)`); **OpenUI only** — decode/upload is host code in **OpenVJ** (`AVVideoPlayer`) |
+| `OpenVJVideoScene` | `Add { Video(url:); SinBody() }` example |
 | `GroupView` | Transparent container for builder content |
 | `EmptyView` | No-op leaf |
 | `AnyView` | Type erasure for renderer storage |
@@ -52,6 +52,11 @@ Generative content is described with the **`OpenUI`** module: a SwiftUI-free **`
 | `OpenVJLiveVideoScene` | Publish + `Mixer { SinBody(); Video(path:) }` |
 | `OpenVJTimedDemoScene` | Same stack with an explicit `time` parameter |
 | `ViewSceneHosting` | `VisualRenderer` + `rootView` (`WGPUVisualRenderer`) |
+| `SourcePlaybackContext` | Per-frame selection + playlist state on `ViewRenderContext.sourcePlayback` |
+| `VideoPlayer` | Decoder protocol; **OpenVJ** provides `AVVideoPlayer` / `VideoFrameSource` |
+| `VJPlayer` | Nested transport scope around child views |
+| `LoopPlayer` | Single-clip loop leaf (same draw path as `Video`) |
+| `Sequence` / `SequencePlayer` | Ordered clips via `.loop()` / `.playOnce()`; index advances in host |
 
 **`Add` vs `Mixer` (v0):** both use one shared render pass and full-screen draws per child (same WGPU pipelines). They differ only in per-layer opacity:
 
@@ -94,7 +99,25 @@ Add {
 }
 ```
 
-Assign `AnyView(OpenVJVideoScene(videoAt: url))` on `WGPUVisualRenderer.rootView` to swap in a video scene. Frames are decoded with `AVPlayer` + `AVPlayerItemVideoOutput`, copied to a BGRA8 WGPU texture each frame, and drawn as a full-screen textured triangle (same layered blend rules as `Add` generative leaves). **v0 limits:** local file URLs only (no HTTP/HLS), no drag-and-drop UI yet, loops on end-of-file, CPU `queue.writeTexture` upload (not zero-copy Metal interop).
+Assign `AnyView(OpenVJVideoScene(videoAt: url))` on `WGPUVisualRenderer.rootView` to swap in a video scene. On macOS, **OpenVJ** decodes with `AVPlayer` + `AVPlayerItemVideoOutput`, copies to a BGRA8 WGPU texture each frame, and draws a full-screen textured triangle (same layered blend rules as `Add` generative leaves). **v0 limits** (full list): [CHANGELOG.md](CHANGELOG.md#010--2026-10-17).
+
+### Playback (v0.1)
+
+Transport and decode stay out of OpenUI leaves except for state carried on **`ViewRenderContext`**. The host renderer calls **`tickPlaybackTransport()`** each frame (after resolving clip durations) so **`SequencePlayer`** can advance; **`VJPlayer`** wraps children with `sourcePlayback.beginVJTransport` / `endVJTransport`.
+
+```swift
+VJPlayer {
+    Mixer {
+        LoopPlayer(url: clipURL)
+        Sequence(
+            Video(path: "/path/a.mov"),
+            Video(path: "/path/b.mov")
+        ).loop()
+    }
+}
+```
+
+Loop/sequence timing is still scaffolding in v0.1 — see **Playback** in [CHANGELOG.md](CHANGELOG.md).
 
 Inter-app publish from the scene graph (backend-agnostic; macOS Syphon when `OpenVJSyphon` is linked):
 
@@ -224,7 +247,7 @@ Scene selection (`OPEN_VJ_SCENE` or `--scene`):
 | Value | Root scene |
 |-------|------------|
 | `default` (default) | `OpenVJDefaultScene` |
-| `source-browser-mixer` | `OpenVJSourceBrowserMixerScene` + CPU Sources chrome (header bar, folder glyphs, row stripes) beside the GPU mix |
+| `source-browser-mixer` | `OpenVJSourceBrowserMixerScene` + CPU Sources chrome (header bar, folder glyphs, row stripes) beside the GPU mix; registers **`HeadlessSourceCatalog`** (scans Movies; placeholder demo/Syphon rows when the folder is empty) |
 | `live` | `OpenVJLiveScene` |
 | `timed-demo` | `OpenVJTimedDemoScene` |
 
