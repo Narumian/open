@@ -32,6 +32,13 @@ public extension VisualRenderer {
     }
 }
 
+/// Renderers that draw a declarative `Visual` tree (default WebGPU implementation).
+public protocol VisualSceneHosting: VisualRenderer {
+    var rootVisual: AnyVisual { get set }
+}
+
+extension WGPUVisualRenderer: VisualSceneHosting {}
+
 /// Registry and factory for `VisualRenderer` backends (default: WebGPU when linked).
 public enum VisualRender {
     public typealias RendererFactory = (_ attachment: VisualSurfaceAttachment) -> VisualRenderer?

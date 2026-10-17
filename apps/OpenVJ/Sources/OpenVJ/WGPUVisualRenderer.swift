@@ -26,6 +26,9 @@ public final class WGPUVisualRenderer: VisualRenderer {
     /// Optional inter-app publisher (Syphon when `OpenVJSyphon` is linked). Off by default on the publisher itself.
     public var interAppPublisher: InterAppTexturePublisher?
 
+    /// Root declarative visual tree rendered each frame.
+    public var rootVisual: AnyVisual = AnyVisual(OpenVJDefaultScene())
+
     public init?(metalLayer: UnsafeMutableRawPointer) {
         installWGPULoggingOnce()
 
@@ -185,9 +188,14 @@ public final class WGPUVisualRenderer: VisualRenderer {
             descriptor.colorAttachmentCount = 1
             descriptor.colorAttachments = attachmentPointer
             guard let pass = wgpuCommandEncoderBeginRenderPass(encoder, &descriptor) else { return false }
-            wgpuRenderPassEncoderSetPipeline(pass, pipeline)
-            wgpuRenderPassEncoderSetBindGroup(pass, 0, bindGroup, 0, nil)
-            wgpuRenderPassEncoderDraw(pass, 3, 1, 0, 0)
+            let drawPipeline = pipeline
+            let drawBindGroup = bindGroup
+            var visualContext = VisualRenderContext {
+                wgpuRenderPassEncoderSetPipeline(pass, drawPipeline)
+                wgpuRenderPassEncoderSetBindGroup(pass, 0, drawBindGroup, 0, nil)
+                wgpuRenderPassEncoderDraw(pass, 3, 1, 0, 0)
+            }
+            rootVisual.render(in: &visualContext)
             wgpuRenderPassEncoderEnd(pass)
             wgpuRenderPassEncoderRelease(pass)
             return true

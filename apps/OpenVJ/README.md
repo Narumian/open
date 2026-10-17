@@ -18,6 +18,23 @@ The app depends on **`VisualRenderer`**, not on WebGPU types directly. Backends 
 
 `OpenVJApp` / `VisualView` hold a `VisualRenderer?` and pass a `VisualSurfaceAttachment` from the view’s `CAMetalLayer`. Syphon publishing attaches an `InterAppTexturePublisher` on that protocol. A future non-WGPU backend can register its own factory without changing the app shell.
 
+## Visual / `body` (declarative scene graph)
+
+Generative content is described with a SwiftUI-like **`Visual`** protocol: recursive **`associatedtype Body: Visual`**, **`@VisualBuilder var body`**, and leaf types with **`Body == Never`**.
+
+| Type | Role |
+|------|------|
+| `Visual` | Scene graph protocol |
+| `VisualBuilder` | `@resultBuilder` for tuples, optionals, `if`/`else` |
+| `ShaderVisual` | Full-screen generative WGSL (default WGPU path) |
+| `GroupVisual` | Transparent container for builder content |
+| `EmptyVisual` | No-op leaf |
+| `AnyVisual` | Type erasure for renderer storage |
+| `OpenVJDefaultScene` | Built-in root scene (`ShaderVisual`) |
+| `VisualSceneHosting` | `VisualRenderer` + `rootVisual` (`WGPUVisualRenderer`) |
+
+`WGPUVisualRenderer.rootVisual` is traversed each frame; assign `AnyVisual(yourScene)` on a `VisualSceneHosting` renderer to swap scenes without touching the AppKit shell.
+
 ## Requirements
 
 - macOS 13+
