@@ -29,6 +29,7 @@ public final class WGPUVisualRenderer: VisualRenderer {
     private var interAppPublisherServerName: String?
     private var videoRenderState: WGPUVideoRenderState?
     private var interAppInputState: WGPUInterAppTextureInputState?
+    private let playbackHost = AVPlaybackHost()
     private static var didLogMissingInterAppBackend = false
     private static var loggedStreamOutputStubs: Set<String> = []
 
@@ -317,6 +318,9 @@ public final class WGPUVisualRenderer: VisualRenderer {
             }
             var visualContext = ViewRenderContext(
                 frameTime: elapsed,
+                resolveClipDuration: { [playbackHost] url in
+                    playbackHost.clipDurationSeconds(for: url)
+                },
                 drawShaderLegacy: {
                     writeUniforms(time: elapsed, waveMode: 0, layerAlpha: 1)
                     drawFullScreen()
@@ -354,6 +358,7 @@ public final class WGPUVisualRenderer: VisualRenderer {
                     Self.logStreamOutputStubOnce(kind)
                 }
             )
+            visualContext.tickPlaybackTransport()
             rootView.render(in: &visualContext)
             wgpuRenderPassEncoderEnd(pass)
             wgpuRenderPassEncoderRelease(pass)

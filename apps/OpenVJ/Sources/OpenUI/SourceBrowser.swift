@@ -36,14 +36,14 @@ public struct SourceBrowser: View {
 
     /// Shared walk for the declarative leaf and flattened `ViewNode.sourceBrowser`.
     static func presentAndDraw(mediaFolderURL: URL?, in context: inout ViewRenderContext) {
-        let selectionState = SourceCatalogRegistry.selectionState
         if let folder = mediaFolderURL {
-            selectionState.mediaFolderURL = folder
+            context.sourcePlayback.mediaFolderURL = folder
         }
+        let folderForUI = context.sourcePlayback.mediaFolderURL ?? mediaFolderURL
         context.requestSourceBrowser(
-            SourceBrowserConfiguration(mediaFolderURL: selectionState.mediaFolderURL ?? mediaFolderURL)
+            SourceBrowserConfiguration(mediaFolderURL: folderForUI)
         )
-        SourceRendering.draw(selection: selectionState.selection, in: &context)
+        SourceRendering.draw(selection: context.sourcePlayback.selection, in: &context)
     }
 }
 

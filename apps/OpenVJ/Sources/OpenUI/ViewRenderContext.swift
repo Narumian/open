@@ -22,7 +22,9 @@ public struct InterAppPublishConfiguration: Sendable {
 /// Backend-neutral draw commands issued while traversing a `View` tree.
 public struct ViewRenderContext {
     public var frameTime: Float
+    public var sourcePlayback: SourcePlaybackContext
 
+    private let resolveClipDuration: (URL) -> Float?
     private var blendLayerIndex: Int
     private var equalWeightMixLayerCount: Int?
     private var savedEqualWeightMixLayerCount: Int?
@@ -38,6 +40,8 @@ public struct ViewRenderContext {
 
     public init(
         frameTime: Float,
+        sourcePlayback: SourcePlaybackContext = SourcePlaybackContext(),
+        resolveClipDuration: @escaping (URL) -> Float? = { _ in nil },
         drawShaderLegacy: @escaping () -> Void,
         drawWaveBody: @escaping (WaveMode, Float, Float) -> Void,
         drawVideo: @escaping (URL, Float) -> Void,
@@ -48,6 +52,8 @@ public struct ViewRenderContext {
         applyStreamOutputStub: @escaping (StreamOutputKind) -> Void = { _ in }
     ) {
         self.frameTime = frameTime
+        self.sourcePlayback = sourcePlayback
+        self.resolveClipDuration = resolveClipDuration
         blendLayerIndex = 0
         equalWeightMixLayerCount = nil
         self.drawShaderLegacy = drawShaderLegacy
@@ -127,8 +133,19 @@ public struct ViewRenderContext {
         drawVideoImpl(fileURL, nextBlendLayerAlpha())
     }
 
+    /// Host adapter hook: clip length in seconds (nil → OpenUI placeholder duration).
+    public func clipDurationSeconds(for fileURL: URL) -> Float? {
+        resolveClipDuration(fileURL)
+    }
+
+    /// Advances any bound `SequencePlayer` transport before or after the tree walk.
+    public mutating func tickPlaybackTransport() {
+        sourcePlayback.tickSequence(frameTime: frameTime, resolveDuration: resolveClipDuration)
+    }
+
     /// Renders a flattened node tree using the same draw hooks as the declarative API.
     public mutating func render(node: ViewNode) {
+        tickPlaybackTransport()
         switch node {
         case .empty:
             break

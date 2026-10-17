@@ -6,7 +6,7 @@ public enum VJPlaybackSession {
     public static var isPlaying: Bool = true
 }
 
-/// Root transport scope. v0: transparent forward; future: owns `SequencePlaybackState` ticks.
+/// Root transport scope: binds session clock and forwards `sourcePlayback` to children.
 public struct VJPlayer<Content: View>: View {
     public let content: Content
 
@@ -14,14 +14,28 @@ public struct VJPlayer<Content: View>: View {
         self.content = content()
     }
 
-    public var body: Content { content }
+    public var body: Never {
+        fatalError("VJPlayer is a composite container")
+    }
+
+    public func renderLeaf(in context: inout ViewRenderContext) {
+        context.sourcePlayback.beginVJTransport(frameTime: context.frameTime)
+        content.render(in: &context)
+        context.sourcePlayback.endVJTransport()
+    }
+}
+
+extension VJPlayer: ViewRepresentable {
+    var viewNode: ViewNode {
+        content.flattenedNode()
+    }
 }
 
 /// Single-clip loop. macOS v0: same draw path as `Video` (decoder loops on end).
 public struct LoopPlayer: View {
     public typealias Body = Never
 
-    public let fileURL: URL
+    public let fileURL: URL?
     public var loops: Bool
 
     public init(url: URL, loops: Bool = true) {
@@ -34,17 +48,30 @@ public struct LoopPlayer: View {
         self.loops = loops
     }
 
+    /// Uses `context.sourcePlayback.selectedLocalFileURL` (e.g. under `SourceBrowser`).
+    public init(browserSelection loops: Bool = true) {
+        fileURL = nil
+        self.loops = loops
+    }
+
     public var body: Never {
         fatalError("LoopPlayer is a leaf")
     }
 
     public func renderLeaf(in context: inout ViewRenderContext) {
-        context.drawVideo(fileURL: fileURL)
+        let url = fileURL ?? context.sourcePlayback.selectedLocalFileURL
+        guard let url else { return }
+        context.drawVideo(fileURL: url)
     }
 }
 
 extension LoopPlayer: ViewRepresentable {
-    var viewNode: ViewNode { .video(fileURL: fileURL.absoluteString) }
+    var viewNode: ViewNode {
+        if let fileURL {
+            return .video(fileURL: fileURL.absoluteString)
+        }
+        return .sourceBrowser
+    }
 }
 
 /// Ordered clip list builder (`Sequence(a, b, c).loop()`).
@@ -72,7 +99,7 @@ public struct Sequence {
     }
 }
 
-/// Host-driven playlist leaf. v0 stub: always draws the first clip until `SequencePlaybackState` is wired.
+/// Host-driven playlist leaf; index advances via `ViewRenderContext.tickPlaybackTransport()`.
 public struct SequencePlayer: View {
     public typealias Body = Never
 
@@ -91,9 +118,9 @@ public struct SequencePlayer: View {
     }
 
     public func renderLeaf(in context: inout ViewRenderContext) {
-        let index = SequencePlaybackState.shared.clipIndex(clips: clips, loops: loops)
-        guard clips.indices.contains(index) else { return }
-        context.drawVideo(fileURL: clips[index])
+        context.sourcePlayback.bindSequence(clips: clips, loops: loops)
+        guard let url = context.sourcePlayback.activeSequenceClipURL() else { return }
+        context.drawVideo(fileURL: url)
     }
 }
 
@@ -101,39 +128,5 @@ extension SequencePlayer: ViewRepresentable {
     var viewNode: ViewNode {
         guard let first = clips.first else { return .empty }
         return .video(fileURL: first.absoluteString)
-    }
-}
-
-/// Mutable playlist index (OpenVJ / browser host advances on clip end). Stub: index 0.
-public final class SequencePlaybackState: @unchecked Sendable {
-    public static let shared = SequencePlaybackState()
-
-    private var clipIndex = 0
-
-    public init() {}
-
-    public func clipIndex(clips: [URL], loops: Bool) -> Int {
-        guard !clips.isEmpty else { return 0 }
-        if clipIndex >= clips.count {
-            clipIndex = loops ? 0 : clips.count - 1
-        }
-        return min(clipIndex, clips.count - 1)
-    }
-
-    /// Future: call from host when clip `i` ends or each frame with durations.
-    public func advance(by count: Int, clipCount: Int, loops: Bool) {
-        guard clipCount > 0 else { return }
-        let next = clipIndex + count
-        if next < clipCount {
-            clipIndex = next
-        } else if loops {
-            clipIndex = next % clipCount
-        } else {
-            clipIndex = clipCount - 1
-        }
-    }
-
-    public func reset() {
-        clipIndex = 0
     }
 }

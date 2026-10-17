@@ -39,3 +39,49 @@ export function localFileFromFile(file: File): SourceDescriptor {
     kind,
   };
 }
+
+/** Mirrors OpenUI `SourcePlaybackContext` + `SequenceTransportState` (host advances clip index). */
+export type SequenceTransportState = {
+  clips: string[];
+  loops: boolean;
+  clipIndex: number;
+  elapsedInClip: number;
+};
+
+export type SourcePlaybackContext = {
+  selection: SourceSelection;
+  sequence?: SequenceTransportState;
+};
+
+export const DEFAULT_CLIP_DURATION_SEC = 10;
+
+export function tickSequenceTransport(
+  state: SequenceTransportState,
+  deltaSec: number,
+  resolveDuration: (url: string) => number | undefined,
+): SequenceTransportState {
+  if (state.clips.length === 0 || deltaSec <= 0) return state;
+  let { clipIndex, elapsedInClip, clips, loops } = state;
+  elapsedInClip += deltaSec;
+  let duration =
+    resolveDuration(clips[clipIndex]) ?? DEFAULT_CLIP_DURATION_SEC;
+  if (duration <= 0) duration = DEFAULT_CLIP_DURATION_SEC;
+
+  while (elapsedInClip >= duration) {
+    elapsedInClip -= duration;
+    const next = clipIndex + 1;
+    if (next < clips.length) {
+      clipIndex = next;
+    } else if (loops) {
+      clipIndex = 0;
+    } else {
+      clipIndex = clips.length - 1;
+      elapsedInClip = duration;
+      break;
+    }
+    duration = resolveDuration(clips[clipIndex]) ?? DEFAULT_CLIP_DURATION_SEC;
+    if (duration <= 0) duration = DEFAULT_CLIP_DURATION_SEC;
+  }
+
+  return { clips, loops, clipIndex, elapsedInClip };
+}
