@@ -1,24 +1,22 @@
 import AppKit
 import OpenUI
+import OpenVJ
 import UniformTypeIdentifiers
-#if canImport(OpenVJSyphon)
-import OpenVJSyphon
-#endif
 
-/// AppKit source picker for `SourceBrowser` scenes (local video folder + Syphon discovery).
+/// AppKit source picker for `SourceBrowser` scenes (local video folder + inter-app input discovery).
 final class SourceBrowserController: NSObject, NSWindowDelegate {
     private var panel: NSPanel?
     private var tableView: NSTableView?
     private var rows: [SourceBrowserRow] = []
-    private var syphonObserver: NSObjectProtocol?
+    private var inputServersObserver: NSObjectProtocol?
     private var configuredFolder: URL?
     private var didAutoPresent = false
 
     private enum SourceBrowserRow: Equatable {
         case none
         case localFile(URL, displayName: String)
-        case syphonServer(name: String, displayName: String)
-        case manualSyphon(name: String)
+        case interAppServer(name: String, displayName: String)
+        case manualInterAppInput(name: String)
     }
 
     func install() {
@@ -27,21 +25,18 @@ final class SourceBrowserController: NSObject, NSWindowDelegate {
                 self?.handlePresent(configuration)
             }
         }
-        #if canImport(OpenVJSyphon)
-        let center = NotificationCenter.default
-        syphonObserver = center.addObserver(
-            forName: NSNotification.Name.SyphonServerAnnounce,
+        inputServersObserver = NotificationCenter.default.addObserver(
+            forName: InterAppTextureRegistry.inputServersDidChangeNotification,
             object: nil,
             queue: .main
         ) { [weak self] _ in
             self?.reloadRows(keepingSelection: true)
         }
-        #endif
     }
 
     deinit {
-        if let syphonObserver {
-            NotificationCenter.default.removeObserver(syphonObserver)
+        if let inputServersObserver {
+            NotificationCenter.default.removeObserver(inputServersObserver)
         }
         SourceBrowserUI.registerPresentHandler(nil)
     }
@@ -124,7 +119,7 @@ final class SourceBrowserController: NSObject, NSWindowDelegate {
         buttonBar.spacing = 8
         buttonBar.addArrangedSubview(makeButton(title: "Choose Folder…", action: #selector(chooseFolder(_:))))
         buttonBar.addArrangedSubview(makeButton(title: "Choose File…", action: #selector(chooseFile(_:))))
-        buttonBar.addArrangedSubview(makeButton(title: "Add Syphon…", action: #selector(addManualSyphon(_:))))
+        buttonBar.addArrangedSubview(makeButton(title: "Add Inter-App Input…", action: #selector(addManualInterAppInput(_:))))
         buttonBar.addArrangedSubview(makeButton(title: "Refresh", action: #selector(refresh(_:))))
         stack.addArrangedSubview(buttonBar)
 
@@ -166,10 +161,10 @@ final class SourceBrowserController: NSObject, NSWindowDelegate {
         reloadRows(keepingSelection: true)
     }
 
-    @objc private func addManualSyphon(_ sender: Any?) {
+    @objc private func addManualInterAppInput(_ sender: Any?) {
         let alert = NSAlert()
-        alert.messageText = "Syphon server name"
-        alert.informativeText = "Enter the published server name (as shown in Syphon clients)."
+        alert.messageText = "Inter-app server name"
+        alert.informativeText = "Enter the published server name from the sending app."
         let field = NSTextField(frame: NSRect(x: 0, y: 0, width: 280, height: 24))
         field.placeholderString = "Server name"
         alert.accessoryView = field
@@ -178,7 +173,7 @@ final class SourceBrowserController: NSObject, NSWindowDelegate {
         guard alert.runModal() == .alertFirstButtonReturn else { return }
         let name = field.stringValue.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !name.isEmpty else { return }
-        SourceBrowserState.shared.selection = .syphonServer(name: name)
+        SourceBrowserState.shared.selection = .interAppInput(name: name)
         reloadRows(keepingSelection: true)
     }
 
@@ -196,11 +191,9 @@ final class SourceBrowserController: NSObject, NSWindowDelegate {
             }
         }
 
-        #if canImport(OpenVJSyphon)
-        for entry in SyphonServerListing.entries() {
-            next.append(.syphonServer(name: entry.serverName, displayName: entry.displayName))
+        for entry in InterAppTextureRegistry.availableInputServers() {
+            next.append(.interAppServer(name: entry.serverName, displayName: entry.displayName))
         }
-        #endif
 
         rows = next
         tableView?.reloadData()
@@ -221,8 +214,8 @@ final class SourceBrowserController: NSObject, NSWindowDelegate {
             SourceBrowserState.shared.selection = .none
         case .localFile(let url, _):
             SourceBrowserState.shared.selection = .localVideo(url)
-        case .syphonServer(let name, _), .manualSyphon(let name):
-            SourceBrowserState.shared.selection = .syphonServer(name: name)
+        case .interAppServer(let name, _), .manualInterAppInput(let name):
+            SourceBrowserState.shared.selection = .interAppInput(name: name)
         }
     }
 }
@@ -263,10 +256,10 @@ extension SourceBrowserController: NSTableViewDataSource, NSTableViewDelegate {
             return "— None (generative only) —"
         case .localFile(_, let displayName):
             return "📁 \(displayName)"
-        case .syphonServer(_, let displayName):
-            return "◎ Syphon: \(displayName)"
-        case .manualSyphon(let name):
-            return "◎ Syphon (manual): \(name)"
+        case .interAppServer(_, let displayName):
+            return "◎ Inter-app: \(displayName)"
+        case .manualInterAppInput(let name):
+            return "◎ Inter-app (manual): \(name)"
         }
     }
 }

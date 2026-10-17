@@ -4,7 +4,7 @@ import OpenVJ
 import OpenVJSyphon
 #endif
 
-/// Registers optional Syphon backends when the app shell starts rendering.
+/// Registers optional inter-app texture backends when the app shell starts rendering.
 final class InterAppTextureController {
     func bootstrapIfNeeded() {
         #if canImport(OpenVJSyphon)

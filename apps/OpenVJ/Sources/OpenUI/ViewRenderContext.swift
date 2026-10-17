@@ -135,7 +135,7 @@ public struct ViewRenderContext {
                 break
             case .localVideo(let url):
                 drawVideo(fileURL: url)
-            case .syphonServer(let name):
+            case .interAppInput(let name):
                 drawInterAppTextureInput(serverName: name)
             }
         case .group(let children):

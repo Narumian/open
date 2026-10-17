@@ -1,17 +1,12 @@
 import Foundation
+import OpenVJ
 import Syphon
 
-public struct SyphonServerEntry: Sendable, Equatable {
-    public var serverName: String
-    public var displayName: String
-}
-
-/// Syphon servers from `SyphonServerDirectory` (for source browser UI).
-public enum SyphonServerListing {
-    public static func entries() -> [SyphonServerEntry] {
+enum SyphonServerListing {
+    static func inputServers() -> [InterAppTextureInputServer] {
         let directory = SyphonServerDirectory.shared()
         let servers = directory.servers(matchingName: nil, appName: nil)
-        var result: [SyphonServerEntry] = []
+        var result: [InterAppTextureInputServer] = []
         for description in servers {
             let serverName = description[SyphonServerDescriptionNameKey] as? String ?? ""
             guard !serverName.isEmpty else { continue }
@@ -22,8 +17,10 @@ public enum SyphonServerListing {
             } else {
                 display = "\(serverName) — \(appName)"
             }
-            result.append(SyphonServerEntry(serverName: serverName, displayName: display))
+            result.append(InterAppTextureInputServer(serverName: serverName, displayName: display))
         }
-        return result.sorted { $0.displayName.localizedCaseInsensitiveCompare($1.displayName) == .orderedAscending }
+        return result.sorted {
+            $0.displayName.localizedCaseInsensitiveCompare($1.displayName) == .orderedAscending
+        }
     }
 }

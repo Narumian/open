@@ -4,7 +4,7 @@ import AppKit
 final class AppDelegate: NSObject, NSApplicationDelegate {
     private var window: NSWindow?
     private weak var visualView: VisualView?
-    private var syphonMenuItem: NSMenuItem?
+    private var interAppPublishMenuItem: NSMenuItem?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         let visualView = VisualView(frame: NSRect(x: 0, y: 0, width: 1280, height: 720))
@@ -44,15 +44,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let viewMenu = NSMenu(title: "View")
         viewMenuItem.submenu = viewMenu
 
-        let syphonItem = NSMenuItem(
-            title: "Publish to Syphon",
-            action: #selector(toggleSyphonPublishing(_:)),
+        let publishItem = NSMenuItem(
+            title: "Publish Inter-App Texture",
+            action: #selector(toggleInterAppPublishing(_:)),
             keyEquivalent: ""
         )
-        syphonItem.target = self
-        syphonItem.state = InterAppTextureSettings.syphonRequestedAtLaunch ? .on : .off
-        viewMenu.addItem(syphonItem)
-        syphonMenuItem = syphonItem
+        publishItem.target = self
+        publishItem.state = InterAppTextureSettings.interAppPublishRequestedAtLaunch ? .on : .off
+        viewMenu.addItem(publishItem)
+        interAppPublishMenuItem = publishItem
 
         let sourcesItem = NSMenuItem(
             title: "Source Browser…",
@@ -70,7 +70,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         visualView?.showSourceBrowser()
     }
 
-    @objc private func toggleSyphonPublishing(_ sender: NSMenuItem) {
+    @objc private func toggleInterAppPublishing(_ sender: NSMenuItem) {
         let next = sender.state != .on
         sender.state = next ? .on : .off
         visualView?.setInterAppPublishing(next)

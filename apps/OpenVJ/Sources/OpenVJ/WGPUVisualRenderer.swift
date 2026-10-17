@@ -31,7 +31,7 @@ public final class WGPUVisualRenderer: VisualRenderer {
     /// When true, `InterAppTexture` publish leaves in the scene graph are ignored (menu kill switch).
     public var sceneInterAppPublishSuppressed = false
 
-    /// Optional inter-app publisher (Syphon when `OpenVJSyphon` is linked). Off by default on the publisher itself.
+    /// Optional inter-app publisher (when a backend is registered). Off by default on the publisher itself.
     public var interAppPublisher: InterAppTexturePublisher?
 
     /// Root declarative visual tree rendered each frame.

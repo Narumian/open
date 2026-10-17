@@ -1,6 +1,8 @@
 # Inter-app texture (Syphon-first)
 
-OpenVJ exchanges GPU frames with other macOS apps through a **backend-agnostic** API in `OpenVJ`. The **OpenUI** surface is always `InterAppTexture*` types — **Syphon is an implementation detail** inside the optional `OpenVJSyphon` module.
+**Invariant: Syphon is only an implementation of `InterAppTexture`; never touch Syphon directly in OpenUI, scenes, or public API.**
+
+OpenVJ exchanges GPU frames with other macOS apps through a **backend-agnostic** API in `OpenVJ`. The **OpenUI** surface is always `InterAppTexture*` types — Syphon lives only inside the optional `OpenVJSyphon` module.
 
 ## Strategy
 
@@ -54,7 +56,7 @@ Add {
 }
 ```
 
-Subscribe + mix remote Syphon with local generative output:
+Subscribe + mix a remote inter-app source with local generative output:
 
 ```swift
 Add {
@@ -71,11 +73,13 @@ Built-in scenes (`OpenUI`):
 | Scene | Use |
 |-------|-----|
 | `OpenVJLiveScene` | Publish `OpenVJ` + `Mixer { SinBody(); TanBody() }` |
-| `OpenVJSyphonMixScene` | Publish + mix subscribed server (default name `OpenVJ`) |
+| `OpenVJInterAppMixScene` | Publish + mix subscribed server (default name `OpenVJ`) |
 | `OpenVJLiveVideoScene(path:)` | Publish + `Video` in `Mixer` |
 | `OpenVJInterAppTextureScene` | Minimal publish demo |
 
-When `OPEN_VJ_SYPHON=1` or View → **Publish to Syphon** was on at last launch, `OpenVJApp` selects `OpenVJLiveScene()` as `rootView`. Publish still works from any scene that includes `InterAppTexture` once the Syphon backend is linked.
+When `OPEN_VJ_INTER_APP_PUBLISH=1` (or legacy `OPEN_VJ_SYPHON=1`) or View → **Publish Inter-App Texture** was on at last launch, `OpenVJApp` selects `OpenVJLiveScene()` as `rootView`. Publish still works from any scene that includes `InterAppTexture` once an inter-app backend is linked.
+
+Source discovery for the macOS source browser uses `InterAppTextureRegistry.availableInputServers()` / `availableInputServerNames()` — not Syphon APIs in OpenUI or `OpenVJApp`.
 
 ## Backends
 
@@ -94,7 +98,7 @@ cd apps/OpenVJ
 bash Scripts/fetch-wgpu.sh    # once
 bash Scripts/fetch-syphon.sh  # once → Vendor/Syphon.xcframework
 swift build
-OPEN_VJ_SYPHON=1 .build/debug/OpenVJApp
+OPEN_VJ_INTER_APP_PUBLISH=1 .build/debug/OpenVJApp
 ```
 
 Without `Vendor/Syphon.xcframework`, `Package.swift` omits `OpenVJSyphon`; `swift build` still succeeds. Publish/subscribe leaves log once if requested without a backend.

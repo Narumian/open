@@ -63,7 +63,7 @@ final class VisualView: NSView {
         if let wgpu = renderer as? WGPUVisualRenderer {
             if SourceBrowserSettings.requestedAtLaunch {
                 wgpu.rootView = AnyView(OpenVJSourceBrowserMixerScene())
-            } else if InterAppTextureSettings.syphonRequestedAtLaunch {
+            } else if InterAppTextureSettings.interAppPublishRequestedAtLaunch {
                 wgpu.rootView = AnyView(OpenVJLiveScene())
                 wgpu.sceneInterAppPublishSuppressed = false
             }

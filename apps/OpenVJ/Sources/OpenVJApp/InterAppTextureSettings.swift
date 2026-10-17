@@ -8,9 +8,12 @@ enum InterAppTextureSettings {
         set { UserDefaults.standard.set(newValue, forKey: defaultsKey) }
     }
 
-    static var syphonRequestedAtLaunch: Bool {
-        let env = ProcessInfo.processInfo.environment["OPEN_VJ_SYPHON"]?.lowercased()
-        if env == "1" || env == "true" || env == "yes" { return true }
+    static var interAppPublishRequestedAtLaunch: Bool {
+        let keys = ["OPEN_VJ_INTER_APP_PUBLISH", "OPEN_VJ_SYPHON"]
+        for key in keys {
+            let env = ProcessInfo.processInfo.environment[key]?.lowercased()
+            if env == "1" || env == "true" || env == "yes" { return true }
+        }
         return publishEnabled
     }
 }

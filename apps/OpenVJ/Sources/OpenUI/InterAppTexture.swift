@@ -1,6 +1,6 @@
 import Foundation
 
-/// Declarative inter-app texture publish leaf (Syphon when `OpenVJSyphon` is linked).
+/// Declarative inter-app texture publish leaf (requires a linked inter-app backend in the app target).
 ///
 /// Does not draw; during tree walk it configures the renderer's inter-app publisher
 /// via `InterAppPublishConfiguration`.
@@ -60,9 +60,9 @@ public struct OpenVJInterAppTextureScene: View {
     }
 }
 
-/// Default live-output scene when Syphon is enabled: publish + equal-weight mix of generative layers.
+/// Default live-output scene when inter-app publish is enabled: publish + equal-weight mix of generative layers.
 ///
-/// Assign on `ViewSceneHosting.rootView`, or let `OpenVJApp` pick it when `OPEN_VJ_SYPHON=1` / menu is on.
+/// Assign on `ViewSceneHosting.rootView`, or let `OpenVJApp` pick it when `OPEN_VJ_INTER_APP_PUBLISH=1` / menu is on.
 public struct OpenVJLiveScene: View {
     public init() {}
 
@@ -77,7 +77,7 @@ public struct OpenVJLiveScene: View {
     }
 }
 
-/// Live scene with a local video file mixed under the same Syphon server name.
+/// Live scene with a local video file mixed under the same inter-app server name.
 public struct OpenVJLiveVideoScene: View {
     public let videoPath: String
 

@@ -1,22 +1,54 @@
 import CWGPU
 import Foundation
 
-/// Shared GPU frame bus for sending visuals to other macOS apps (Syphon, future NDI, etc.).
+/// Announced remote server that can be subscribed via `InterAppTextureInput`.
+public struct InterAppTextureInputServer: Sendable, Equatable {
+    public var serverName: String
+    public var displayName: String
+
+    public init(serverName: String, displayName: String) {
+        self.serverName = serverName
+        self.displayName = displayName
+    }
+}
+
+/// Shared GPU frame bus for sending visuals to other macOS apps (optional platform backends).
 public enum InterAppTextureRegistry {
     public typealias PublisherFactory = (_ configuration: PublisherConfiguration) -> InterAppTexturePublisher?
     public typealias SubscriberFactory = (_ configuration: SubscriberConfiguration) -> InterAppTextureSubscriber?
+    public typealias InputServerDiscovery = () -> [InterAppTextureInputServer]
+
+    public static let inputServersDidChangeNotification = Notification.Name("InterAppTextureRegistry.inputServersDidChange")
 
     private static var publisherFactory: PublisherFactory?
     private static var subscriberFactory: SubscriberFactory?
+    private static var inputServerDiscovery: InputServerDiscovery?
 
-    /// Register a platform backend (e.g. Syphon). Called from optional `OpenVJSyphon` at load time.
+    /// Register a platform publish backend. Called from optional inter-app modules at load time.
     public static func registerPublisherFactory(_ factory: @escaping PublisherFactory) {
         publisherFactory = factory
     }
 
-    /// Register a receive backend (e.g. Syphon client). Called from optional `OpenVJSyphon` at load time.
+    /// Register a platform subscribe backend. Called from optional inter-app modules at load time.
     public static func registerSubscriberFactory(_ factory: @escaping SubscriberFactory) {
         subscriberFactory = factory
+    }
+
+    /// Register discovery for remote input servers (source browser, etc.).
+    public static func registerInputServerDiscovery(_ discovery: @escaping InputServerDiscovery) {
+        inputServerDiscovery = discovery
+    }
+
+    public static func availableInputServers() -> [InterAppTextureInputServer] {
+        inputServerDiscovery?() ?? []
+    }
+
+    public static func availableInputServerNames() -> [String] {
+        availableInputServers().map(\.serverName)
+    }
+
+    public static func notifyInputServersDidChange() {
+        NotificationCenter.default.post(name: inputServersDidChangeNotification, object: nil)
     }
 
     public static func makePublisher(configuration: PublisherConfiguration) -> InterAppTexturePublisher? {

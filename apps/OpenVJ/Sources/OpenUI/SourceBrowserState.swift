@@ -4,7 +4,7 @@ import Foundation
 public enum SourceBrowserSelection: Sendable, Equatable {
     case none
     case localVideo(URL)
-    case syphonServer(name: String)
+    case interAppInput(name: String)
 }
 
 /// Thread-safe selection shared between `OpenVJApp` and the declarative scene graph.

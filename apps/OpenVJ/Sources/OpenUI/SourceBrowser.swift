@@ -4,7 +4,7 @@ import Foundation
 ///
 /// During tree walk this leaf:
 /// 1. Requests the AppKit source browser panel (once per scene attachment).
-/// 2. Draws the current `SourceBrowserState.shared.selection` (local `Video` or Syphon subscribe).
+/// 2. Draws the current `SourceBrowserState.shared.selection` (local `Video` or inter-app subscribe).
 ///
 /// v0: no GPU draw when selection is `.none` (mixer sibling layers still render).
 public struct SourceBrowser: View {
@@ -41,7 +41,7 @@ public struct SourceBrowser: View {
             break
         case .localVideo(let url):
             context.drawVideo(fileURL: url)
-        case .syphonServer(let name):
+        case .interAppInput(let name):
             context.drawInterAppTextureInput(serverName: name)
         }
     }

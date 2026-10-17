@@ -16,7 +16,7 @@ The app depends on **`VisualRenderer`**, not on WebGPU types directly. Backends 
 | `VisualRender` | Factory + optional `registerRendererFactory` override |
 | `WGPUVisualRenderer` | Default WebGPU implementation (registered automatically) |
 
-`OpenVJApp` / `VisualView` hold a `VisualRenderer?` and pass a `VisualSurfaceAttachment` from the view’s `CAMetalLayer`. Syphon publishing attaches an `InterAppTexturePublisher` on that protocol. A future non-WGPU backend can register its own factory without changing the app shell.
+`OpenVJApp` / `VisualView` hold a `VisualRenderer?` and pass a `VisualSurfaceAttachment` from the view’s `CAMetalLayer`. Inter-app publish attaches an `InterAppTexturePublisher` on that protocol. A future non-WGPU backend can register its own factory without changing the app shell.
 
 ## OpenUI / `body` (declarative scene graph)
 
@@ -40,11 +40,11 @@ Generative content is described with the **`OpenUI`** module: a SwiftUI-free **`
 | `AnyView` | Type erasure for renderer storage |
 | `InterAppTexture` | Leaf: request inter-app publish (`InterAppTexture("OpenVJ")`) — no draw |
 | `SomeVisual` / `Some` | Demo sin wave leaf (`typealias Some = SomeVisual`) |
-| `SourceBrowser` | Leaf: macOS source picker + draws selected file / Syphon input |
+| `SourceBrowser` | Leaf: macOS source picker + draws selected file / inter-app input |
 | `OpenVJSourceBrowserMixerScene` | `Mixer { SourceBrowser(); Some() }` example |
 | `OpenVJDefaultScene` | Built-in root scene (`Add { SinBody(); TanBody().time(...) }`) |
 | `OpenVJInterAppTextureScene` | `Add { InterAppTexture("OpenVJ"); SomeVisual() }` |
-| `OpenVJLiveScene` | `Add { InterAppTexture("OpenVJ"); Mixer { SinBody(); TanBody() } }` — used when Syphon is on at launch |
+| `OpenVJLiveScene` | `Add { InterAppTexture("OpenVJ"); Mixer { SinBody(); TanBody() } }` — used when inter-app publish is on at launch |
 | `OpenVJLiveVideoScene` | Publish + `Mixer { SinBody(); Video(path:) }` |
 | `OpenVJTimedDemoScene` | Same stack with an explicit `time` parameter |
 | `ViewSceneHosting` | `VisualRenderer` + `rootView` (`WGPUVisualRenderer`) |
@@ -92,7 +92,7 @@ Add {
 
 Assign `AnyView(OpenVJVideoScene(videoAt: url))` on `WGPUVisualRenderer.rootView` to swap in a video scene. Frames are decoded with `AVPlayer` + `AVPlayerItemVideoOutput`, copied to a BGRA8 WGPU texture each frame, and drawn as a full-screen textured triangle (same layered blend rules as `Add` generative leaves). **v0 limits:** local file URLs only (no HTTP/HLS), no drag-and-drop UI yet, loops on end-of-file, CPU `queue.writeTexture` upload (not zero-copy Metal interop).
 
-Inter-app publish from the scene graph (backend-agnostic; Syphon only when `OpenVJSyphon` is linked):
+Inter-app publish from the scene graph (backend-agnostic; macOS Syphon when `OpenVJSyphon` is linked):
 
 ```swift
 Add {
@@ -104,9 +104,9 @@ Add {
 }
 ```
 
-During tree walk, `InterAppTexture` configures `InterAppTexturePublisher` via `InterAppTextureRegistry.makePublisher(configuration:)` — the renderer does not call Syphon directly. `OpenVJApp` calls `openVJSyphonBootstrap()` when rendering starts (no app-side Syphon setup). Without a linked backend, publish is a no-op and OpenVJ logs once.
+During tree walk, `InterAppTexture` configures `InterAppTexturePublisher` via `InterAppTextureRegistry.makePublisher(configuration:)` — OpenUI never imports Syphon. `OpenVJApp` bootstraps the optional backend when rendering starts. Without a linked backend, publish is a no-op and OpenVJ logs once.
 
-Subscribe from another app’s Syphon server:
+Subscribe from another app’s inter-app server:
 
 ```swift
 Mixer {
@@ -134,8 +134,8 @@ Mixer {
 
 1. First time the scene graph walks a `SourceBrowser` leaf, the floating **Sources** panel opens (or use **View → Source Browser…**, ⇧⌘B).
 2. The panel lists video files in your Movies folder (or **Choose Folder…** / **Choose File…**).
-3. When `OpenVJSyphon` is linked, announced Syphon servers appear; **Add Syphon…** accepts a manual server name.
-4. Selection is stored in `SourceBrowserState.shared`. Each frame, `SourceBrowser` draws the active choice (`Video` for local files, `InterAppTextureInput` for Syphon) at its mixer layer weight; `Some()` keeps a generative sin layer in the mix.
+3. When an inter-app backend is linked, announced servers appear via `InterAppTextureRegistry.availableInputServers()`; **Add Inter-App Input…** accepts a manual server name.
+4. Selection is stored in `SourceBrowserState.shared`. Each frame, `SourceBrowser` draws the active choice (`Video` for local files, `InterAppTextureInput` for remote servers) at its mixer layer weight; `Some()` keeps a generative sin layer in the mix.
 
 Launch with the example scene as root:
 
@@ -187,8 +187,8 @@ No Syphon framework is required for a normal build.
 
    Optional conveniences:
 
-   - **Environment:** `OPEN_VJ_SYPHON=1 .build/debug/OpenVJApp` (selects `OpenVJLiveScene` at startup)
-   - **Menu:** View → **Publish to Syphon** — kill switch for publish leaves (persists in UserDefaults)
+   - **Environment:** `OPEN_VJ_INTER_APP_PUBLISH=1 .build/debug/OpenVJApp` (legacy alias `OPEN_VJ_SYPHON=1`; selects `OpenVJLiveScene` at startup)
+   - **Menu:** View → **Publish Inter-App Texture** — kill switch for publish leaves (persists in UserDefaults)
 
 Other apps see a server matching the `InterAppTexture` name in Syphon clients (e.g. VDMX, Resolume).
 
@@ -230,4 +230,4 @@ xcodebuild -scheme OpenVJApp -destination 'platform=macOS' build
 | `OpenVJ` | `VisualRenderer` + `WGPUVisualRenderer` + `InterAppTexture` registry |
 | `OpenVJApple` | Metal-layer → wgpu surface bridge |
 | `OpenVJSyphon` | Syphon publisher backend (when `Vendor/Syphon.xcframework` exists) |
-| `OpenVJApp` | AppKit shell (`VisualView`, 60Hz timer, optional Syphon menu) |
+| `OpenVJApp` | AppKit shell (`VisualView`, 60Hz timer, optional inter-app publish menu) |

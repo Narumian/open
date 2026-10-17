@@ -1,6 +1,6 @@
 import Foundation
 
-/// Declarative inter-app texture subscribe leaf (Syphon when `OpenVJSyphon` is linked).
+/// Declarative inter-app texture subscribe leaf (requires a linked inter-app backend in the app target).
 ///
 /// Draws the latest frame from a remote server as a composited layer (same blend path as `Video`).
 public struct InterAppTextureInput: View {
@@ -32,8 +32,8 @@ extension InterAppTexture {
     }
 }
 
-/// Example: publish local output and mix in a remote Syphon source by name.
-public struct OpenVJSyphonMixScene: View {
+/// Example: publish local output and mix in a remote inter-app source by name.
+public struct OpenVJInterAppMixScene: View {
     public let remoteServerName: String
 
     public init(remoteServerName: String = "OpenVJ") {
