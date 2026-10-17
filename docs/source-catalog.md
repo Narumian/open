@@ -41,6 +41,14 @@ Hosts register a `SourceCatalog` at launch. The `SourceBrowser()` view walks the
 
 `VisualView` constructs the catalog, calls `SourceCatalogRegistry.register`, and `SourceBrowserController` drives the same `SourceSelectionState`.
 
+### Local files (macOS v0.2)
+
+On macOS, local media discovery lives in **`MacSourceCatalog`** via Foundation **`FileManager`** (directory scan of `selectionState.mediaFolderURL`, default Movies). There is **no** `FileServer` protocol in v0.2 — listing stays in the AppKit host, not a shared file-serving abstraction.
+
+A web or REPL source picker is **out of scope** for OpenVJ; the floating Sources panel and `SourceBrowserController` are the v0 UX.
+
+**`SourceCatalogRegistry`** remains the injection point: register any `SourceCatalog` at launch so a future host can supply sources without changing OpenUI leaves.
+
 ## Web (minimal)
 
 TypeScript mirrors for a future browser host (`apps/open/web/source.ts`):
