@@ -171,8 +171,10 @@ See [docs/source-catalog.md](../../docs/source-catalog.md) for `Source`, `Openab
 Launch with the example scene as root:
 
 ```bash
-OPEN_VJ_SOURCE_BROWSER=1 .build/debug/OpenVJApp
+.build/debug/OpenVJApp
 ```
+
+The main window uses `OpenVJSourceBrowserMixerScene` by default (catalog video + generative `Some()`). **View → Source Browser…** (⇧⌘B) opens the Sources panel.
 
 ## Requirements
 
