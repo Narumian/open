@@ -131,10 +131,12 @@ public typealias InterAppTextureInputRegistry = InterAppTextureRegistry.Input
 public struct PublisherConfiguration: Sendable {
     public var serverName: String
     public var enabled: Bool
+    public var textureBus: String?
 
-    public init(serverName: String = "OpenVJ", enabled: Bool = true) {
+    public init(serverName: String = "OpenVJ", enabled: Bool = true, textureBus: String? = nil) {
         self.serverName = serverName
         self.enabled = enabled
+        self.textureBus = textureBus
     }
 }
 

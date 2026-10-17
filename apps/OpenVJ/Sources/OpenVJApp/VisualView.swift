@@ -2,6 +2,9 @@ import AppKit
 import OpenUI
 import OpenVJ
 import QuartzCore
+#if canImport(OpenVJXRender)
+import OpenVJXRender
+#endif
 
 final class VisualView: NSView {
     private var renderer: VisualRenderer?
@@ -53,6 +56,9 @@ final class VisualView: NSView {
 
     private func startRenderingIfNeeded() {
         guard let metalLayer, renderer == nil else { return }
+        #if canImport(OpenVJXRender)
+        openVJXRenderBootstrap()
+        #endif
         let layerPointer = Unmanaged.passUnretained(metalLayer).toOpaque()
         let attachment = VisualSurfaceAttachment(metalLayer: layerPointer)
         guard let renderer = VisualRender.makeRenderer(attachment: attachment) else {
@@ -62,12 +68,24 @@ final class VisualView: NSView {
         interAppController.bootstrapIfNeeded()
         SourceCatalogRegistry.register(sourceCatalog)
         sourceBrowserController.install()
-        if let wgpu = renderer as? WGPUVisualRenderer {
-            if SourceBrowserSettings.requestedAtLaunch {
-                wgpu.rootView = AnyView(OpenVJSourceBrowserMixerScene())
-            } else if InterAppTextureSettings.interAppPublishRequestedAtLaunch {
-                wgpu.rootView = AnyView(OpenVJLiveScene())
-                wgpu.sceneInterAppPublishSuppressed = false
+        if let hosting = renderer as? ViewSceneHosting {
+            let program = OpenVJVisualProgramResolver.forApp(
+                interAppPublishAtLaunch: InterAppTextureSettings.interAppPublishRequestedAtLaunch
+            )
+            #if canImport(OpenVJXRender)
+            OpenVJXVisualProgramApplication.apply(program, hosting: hosting, renderer: renderer)
+            #else
+            OpenVJVisualProgramApplication.apply(program, to: hosting)
+            #endif
+            if InterAppTextureSettings.interAppPublishRequestedAtLaunch {
+                if let wgpu = renderer as? WGPUVisualRenderer {
+                    wgpu.sceneInterAppPublishSuppressed = false
+                }
+                #if canImport(OpenVJXRender)
+                if let xrender = renderer as? XRendererVisualRenderer {
+                    xrender.sceneInterAppPublishSuppressed = false
+                }
+                #endif
             }
         }
         updateDrawableSize()
@@ -110,11 +128,23 @@ final class VisualView: NSView {
         if let wgpu = renderer as? WGPUVisualRenderer {
             wgpu.sceneInterAppPublishSuppressed = !enabled
         }
+        #if canImport(OpenVJXRender)
+        if let xrender = renderer as? XRendererVisualRenderer {
+            xrender.sceneInterAppPublishSuppressed = !enabled
+        }
+        #endif
     }
 
     var isInterAppPublishing: Bool {
-        guard let wgpu = renderer as? WGPUVisualRenderer else { return false }
-        return !wgpu.sceneInterAppPublishSuppressed
+        if let wgpu = renderer as? WGPUVisualRenderer {
+            return !wgpu.sceneInterAppPublishSuppressed
+        }
+        #if canImport(OpenVJXRender)
+        if let xrender = renderer as? XRendererVisualRenderer {
+            return !xrender.sceneInterAppPublishSuppressed
+        }
+        #endif
+        return false
     }
 
     func showSourceBrowser() {

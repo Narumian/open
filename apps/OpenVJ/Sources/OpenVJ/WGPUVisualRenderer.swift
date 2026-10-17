@@ -352,7 +352,8 @@ public final class WGPUVisualRenderer: VisualRenderer {
                     applyInterAppPublishConfiguration(
                         PublisherConfiguration(
                             serverName: configuration.serverName,
-                            enabled: configuration.enabled
+                            enabled: configuration.enabled,
+                            textureBus: configuration.textureBus
                         )
                     )
                 },
@@ -365,7 +366,6 @@ public final class WGPUVisualRenderer: VisualRenderer {
                     Self.logStreamOutputStubOnce(kind)
                 }
             )
-            visualContext.tickPlaybackTransport()
             rootView.render(in: &visualContext)
             wgpuRenderPassEncoderEnd(pass)
             wgpuRenderPassEncoderRelease(pass)

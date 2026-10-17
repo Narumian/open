@@ -6,19 +6,35 @@ import PackageDescription
 let packageDir = URL(fileURLWithPath: #filePath).deletingLastPathComponent()
 let syphonXCFramework = packageDir.appendingPathComponent("Vendor/Syphon.xcframework/Info.plist")
 let syphonAvailable = FileManager.default.fileExists(atPath: syphonXCFramework.path)
+let swiftXPackage = packageDir.appendingPathComponent("../../../SwiftXUI")
+let swiftXAvailable = FileManager.default.fileExists(atPath: swiftXPackage.appendingPathComponent("Package.swift").path)
 
-var targets: [Target] = [
-    .binaryTarget(
-        name: "CWGPU",
-        path: "Vendor/CWGPU.xcframework"
-    ),
+let cwgpuDependency: Target.Dependency = swiftXAvailable
+    ? .product(name: "CWGPU", package: "SwiftXUI")
+    : .byName(name: "CWGPU")
+
+var targets: [Target] = []
+if !swiftXAvailable {
+    targets.append(
+        .binaryTarget(
+            name: "CWGPU",
+            path: "Vendor/CWGPU.xcframework"
+        )
+    )
+}
+
+targets.append(contentsOf: [
     .target(
         name: "OpenUI",
-        path: "Sources/OpenUI"
+        path: "Sources/OpenUI",
+        exclude: [
+            "Deferred/README.md",
+            "Deferred/VJPlaybackDSL.swift",
+        ]
     ),
     .target(
         name: "OpenVJApple",
-        dependencies: ["CWGPU"],
+        dependencies: [cwgpuDependency],
         path: "Sources/OpenVJApple",
         publicHeadersPath: "include",
         linkerSettings: [
@@ -28,7 +44,7 @@ var targets: [Target] = [
     ),
     .target(
         name: "OpenVJ",
-        dependencies: ["CWGPU", "OpenVJApple", "OpenUI"],
+        dependencies: [cwgpuDependency, "OpenVJApple", "OpenUI"],
         path: "Sources/OpenVJ",
         linkerSettings: [
             .linkedFramework("AVFoundation"),
@@ -37,7 +53,7 @@ var targets: [Target] = [
             .linkedLibrary("c++"),
         ]
     ),
-]
+])
 
 var openVJAppDependencies: [Target.Dependency] = ["OpenVJ"]
 var products: [Product] = [
@@ -52,7 +68,7 @@ if syphonAvailable {
     targets.append(
         .target(
             name: "OpenVJSyphon",
-            dependencies: ["OpenVJ", "Syphon", "CWGPU"],
+            dependencies: ["OpenVJ", "Syphon", cwgpuDependency],
             path: "Sources/OpenVJSyphon",
             linkerSettings: [
                 .linkedFramework("AppKit"),
@@ -64,19 +80,6 @@ if syphonAvailable {
     products.append(.library(name: "OpenVJSyphon", targets: ["OpenVJSyphon"]))
     openVJAppDependencies.append("OpenVJSyphon")
 }
-
-targets.append(
-    .executableTarget(
-        name: "OpenVJApp",
-        dependencies: openVJAppDependencies,
-        path: "Sources/OpenVJApp",
-        linkerSettings: [
-            .linkedFramework("AppKit"),
-            .linkedFramework("QuartzCore"),
-            .linkedFramework("Metal"),
-        ]
-    )
-)
 
 targets.append(
     .executableTarget(
@@ -93,9 +96,57 @@ targets.append(
     )
 )
 
+var packageDependencies: [Package.Dependency] = []
+if swiftXAvailable {
+    packageDependencies.append(.package(path: swiftXPackage.path))
+}
+
+if swiftXAvailable {
+    targets.append(
+        .target(
+            name: "OpenVJXRender",
+            dependencies: [
+                "OpenUI",
+                "OpenVJ",
+                cwgpuDependency,
+                .product(name: "XRender", package: "SwiftXUI"),
+                .product(name: "XRenderWGPU", package: "SwiftXUI"),
+                .product(name: "XRenderApple", package: "SwiftXUI"),
+                .product(name: "XShader", package: "SwiftXUI"),
+                .product(name: "XUI", package: "SwiftXUI"),
+                .product(name: "XUIHost", package: "SwiftXUI"),
+            ],
+            path: "Sources/OpenVJXRender",
+            linkerSettings: [
+                .linkedFramework("AVFoundation"),
+                .linkedFramework("CoreVideo"),
+                .linkedFramework("Metal"),
+                .linkedFramework("QuartzCore"),
+                .linkedLibrary("c++"),
+            ]
+        )
+    )
+    products.append(.library(name: "OpenVJXRender", targets: ["OpenVJXRender"]))
+    openVJAppDependencies.append("OpenVJXRender")
+}
+
+targets.append(
+    .executableTarget(
+        name: "OpenVJApp",
+        dependencies: openVJAppDependencies,
+        path: "Sources/OpenVJApp",
+        linkerSettings: [
+            .linkedFramework("AppKit"),
+            .linkedFramework("QuartzCore"),
+            .linkedFramework("Metal"),
+        ]
+    )
+)
+
 let package = Package(
     name: "OpenVJ",
     platforms: [.macOS(.v13)],
     products: products,
+    dependencies: packageDependencies,
     targets: targets
 )

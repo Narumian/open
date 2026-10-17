@@ -8,21 +8,31 @@ import Foundation
 public struct SourceBrowser: View {
     public typealias Body = Never
 
+    public let deckID: String?
     public let mediaFolderURL: URL?
 
     public init() {
+        deckID = nil
         mediaFolderURL = nil
     }
 
+    public init(deck: String, mediaFolderURL: URL? = nil) {
+        deckID = deck
+        self.mediaFolderURL = mediaFolderURL
+    }
+
     public init(mediaFolder: URL) {
+        deckID = nil
         mediaFolderURL = mediaFolder
     }
 
     public init(mediaFolderPath: String) {
+        deckID = nil
         mediaFolderURL = URL(fileURLWithPath: mediaFolderPath)
     }
 
     public init(mediaFolderURL: URL?) {
+        deckID = nil
         self.mediaFolderURL = mediaFolderURL
     }
 
@@ -31,24 +41,35 @@ public struct SourceBrowser: View {
     }
 
     public func renderLeaf(in context: inout ViewRenderContext) {
-        Self.presentAndDraw(mediaFolderURL: mediaFolderURL, in: &context)
+        Self.presentAndDraw(mediaFolderURL: mediaFolderURL, deckID: deckID, in: &context)
     }
 
     /// Shared walk for the declarative leaf and flattened `ViewNode.sourceBrowser`.
-    static func presentAndDraw(mediaFolderURL: URL?, in context: inout ViewRenderContext) {
-        if let folder = mediaFolderURL {
-            context.sourcePlayback.mediaFolderURL = folder
+    public static func presentAndDraw(
+        mediaFolderURL: URL?,
+        deckID: String? = nil,
+        in context: inout ViewRenderContext
+    ) {
+        var playback = context.sourcePlayback
+        if let deckID {
+            playback = SourcePlaybackContext(deckID: deckID)
         }
-        let folderForUI = context.sourcePlayback.mediaFolderURL ?? mediaFolderURL
+        if let folder = mediaFolderURL {
+            playback.mediaFolderURL = folder
+        }
+        let folderForUI = playback.mediaFolderURL ?? mediaFolderURL
         context.requestSourceBrowser(
-            SourceBrowserConfiguration(mediaFolderURL: folderForUI)
+            SourceBrowserConfiguration(mediaFolderURL: folderForUI, deckID: deckID)
         )
-        SourceRendering.draw(selection: context.sourcePlayback.selection, in: &context)
+        var drawContext = context
+        drawContext.sourcePlayback = playback
+        SourceRendering.draw(selection: playback.selection, in: &drawContext)
+        context.sourcePlayback = drawContext.sourcePlayback
     }
 }
 
 extension SourceBrowser: ViewRepresentable {
-    var viewNode: ViewNode { .sourceBrowser }
+    var viewNode: ViewNode { .sourceBrowser(deckID: deckID, mediaFolderURL: mediaFolderURL?.absoluteString) }
 }
 
 /// Documented example: equal-weight mix of browser-driven input + generative placeholder.
@@ -66,10 +87,24 @@ public struct OpenVJSourceBrowserMixerScene: View {
         mediaFolderURL = mediaFolder
     }
 
-    public var body: Mixer<TupleView2<SourceBrowser, Some>> {
-        Mixer {
-            SourceBrowser(mediaFolderURL: mediaFolderURL)
-            Some()
+    public typealias Body = Add<
+        TupleView2<
+            Output<InterAppTextureOutput>,
+            OffscreenTexture<Mixer<TupleView2<SourceBrowser, SourceBrowser>>>
+        >
+    >
+
+    public var body: Body {
+        Add {
+            Output {
+                InterAppTextureOutput("OpenVJ", bus: "mix")
+            }
+            OffscreenTexture("mix") {
+                Mixer {
+                    SourceBrowser(deck: "A", mediaFolderURL: mediaFolderURL)
+                    SourceBrowser(deck: "B", mediaFolderURL: mediaFolderURL)
+                }
+            }
         }
     }
 }

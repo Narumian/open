@@ -40,14 +40,14 @@ private enum _ViewRenderWalker {
     }
 }
 
-/// Default generative scene shipped with OpenVJ.
+/// Default scene: source browser + generative placeholder (`Some`), same shape as the app window.
 public struct OpenVJDefaultScene: View {
     public init() {}
 
-    public var body: Add<TupleView2<SinBody, TanBody>> {
-        Add {
-            SinBody()
-            TanBody().time(OpenVJSceneTime.current)
+    public var body: Mixer<TupleView2<SourceBrowser, Some>> {
+        Mixer {
+            SourceBrowser()
+            Some()
         }
     }
 }
