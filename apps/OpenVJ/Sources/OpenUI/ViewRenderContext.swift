@@ -12,10 +12,13 @@ public enum StreamOutputKind: Sendable, Equatable {
 public struct InterAppPublishConfiguration: Sendable {
     public var serverName: String
     public var enabled: Bool
+    /// When set, publish the named `OffscreenTexture` bus instead of the swapchain (XRenderer).
+    public var textureBus: String?
 
-    public init(serverName: String, enabled: Bool = true) {
+    public init(serverName: String, enabled: Bool = true, textureBus: String? = nil) {
         self.serverName = serverName
         self.enabled = enabled
+        self.textureBus = textureBus
     }
 }
 
@@ -39,6 +42,7 @@ public struct ViewRenderContext {
     private let applyInterAppSubscribe: (InterAppSubscribeConfiguration) -> Void
     private let applySourceBrowser: (SourceBrowserConfiguration) -> Void
     private let applyStreamOutputStub: (StreamOutputKind) -> Void
+    private var offscreenTextureName: String?
 
     public init(
         frameTime: Float,
@@ -95,9 +99,23 @@ public struct ViewRenderContext {
         savedBlendLayerIndex = nil
     }
 
+    public mutating func beginOffscreenTexture(name: String) {
+        offscreenTextureName = name
+    }
+
+    public mutating func endOffscreenTexture() {
+        offscreenTextureName = nil
+    }
+
     /// Called by `InterAppTextureOutput` during tree walk.
-    public mutating func requestInterAppTextureOutput(serverName: String, enabled: Bool = true) {
-        applyInterAppPublish(InterAppPublishConfiguration(serverName: serverName, enabled: enabled))
+    public mutating func requestInterAppTextureOutput(
+        serverName: String,
+        textureBus: String? = nil,
+        enabled: Bool = true
+    ) {
+        applyInterAppPublish(
+            InterAppPublishConfiguration(serverName: serverName, enabled: enabled, textureBus: textureBus)
+        )
     }
 
     /// Stub stream outputs (`EncodedStream`, `FileRecording`, …) inside `Output { }`.
@@ -170,16 +188,19 @@ public struct ViewRenderContext {
             drawGenerativeShader()
         case .waveBody(let mode, let explicitTime):
             drawWaveBody(mode: mode, time: explicitTime)
-        case .interAppTextureOutput(let serverName):
-            requestInterAppTextureOutput(serverName: serverName)
+        case .interAppTextureOutput(let serverName, let textureBus):
+            requestInterAppTextureOutput(serverName: serverName, textureBus: textureBus)
         case .interAppSubscribe(let serverName):
             drawInterAppTextureInput(serverName: serverName)
         case .video(let fileURLString):
             if let url = URL(string: fileURLString) {
                 drawVideo(fileURL: url)
             }
-        case .sourceBrowser:
-            SourceBrowser.presentAndDraw(mediaFolderURL: nil, in: &self)
+        case .sourceBrowser(let deckID, let mediaFolderURL):
+            let folder = mediaFolderURL.flatMap { URL(string: $0) }
+            SourceBrowser.presentAndDraw(mediaFolderURL: folder, deckID: deckID, in: &self)
+        case .offscreenTexture(_, let child):
+            render(node: child)
         case .group(let children):
             for child in children {
                 render(node: child)

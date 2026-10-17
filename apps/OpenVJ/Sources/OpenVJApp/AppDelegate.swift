@@ -1,6 +1,18 @@
 import AppKit
 
 @main
+enum OpenVJAppMain {
+    static func main() {
+        let app = NSApplication.shared
+        let delegate = AppDelegate()
+        app.setActivationPolicy(.regular)
+        app.delegate = delegate
+        withExtendedLifetime(delegate) {
+            app.run()
+        }
+    }
+}
+
 final class AppDelegate: NSObject, NSApplicationDelegate {
     private var window: NSWindow?
     private weak var visualView: VisualView?
@@ -23,7 +35,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         window.collectionBehavior = [.fullScreenPrimary]
         self.window = window
 
-        NSApp.setActivationPolicy(.regular)
         configureMainMenu()
         NSApp.activate(ignoringOtherApps: true)
     }

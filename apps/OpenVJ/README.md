@@ -6,6 +6,18 @@ Standalone macOS generative visuals via **WebGPU** ([wgpu-native](https://github
 
 Rendering uses a `CAMetalLayer` surface with wgpu’s Metal backend — not a direct `MTKView` Metal renderer.
 
+## Visual program (single entry)
+
+| API | Role |
+|------|------|
+| `OpenVJVisualProgram` | Named scene: `default`, `sourceBrowserMixer`, `live`, `timedDemo` → `openUIRootView` |
+| `OpenVJVisualProgramResolver` | `forApp()` (window), `forHeadless()` (`OPEN_VJ_SCENE` / CLI) |
+| `OpenVJVisualProgramApplication` | Sets `ViewSceneHosting.rootView` |
+| `OpenVJXVisualProgramApplication` | Also sets `XRendererVisualRenderer.visualProgram` (XUI vs OpenUI compiler) |
+| `OpenVJXUIPipeline` | Today: `deckMixer` for `sourceBrowserMixer`; other programs use OpenUI compiler on XRenderer |
+
+Environment: `OPEN_VJ_SCENE=source-browser-mixer` (aliases in `OpenVJVisualProgram.parseSceneName`). App default without env: **source-browser-mixer**; headless default: **default**.
+
 ## Renderer abstraction
 
 The app depends on **`VisualRenderer`**, not on WebGPU types directly. Backends are created through **`VisualRender.makeRenderer(attachment:)`** (same registry pattern as `InterAppTextureRegistry`).

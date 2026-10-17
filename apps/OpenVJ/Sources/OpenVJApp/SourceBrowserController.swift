@@ -6,11 +6,8 @@ import UniformTypeIdentifiers
 /// AppKit source picker for `SourceBrowser` scenes (local video folder + inter-app input discovery).
 final class SourceBrowserController: NSObject, NSWindowDelegate {
     private let catalog: MacSourceCatalog
-    private var panel: NSPanel?
-    private var tableView: NSTableView?
-    private var rows: [SourceBrowserRow] = []
+    private var sessions: [String: DeckSession] = [:]
     private var inputServersObserver: NSObjectProtocol?
-    private var didAutoPresent = false
 
     init(catalog: MacSourceCatalog) {
         self.catalog = catalog
@@ -21,6 +18,18 @@ final class SourceBrowserController: NSObject, NSWindowDelegate {
         case none
         case catalogEntry(SourceDescriptor)
         case manualInterAppInput(name: String)
+    }
+
+    private final class DeckSession {
+        let deckID: String?
+        var panel: NSPanel?
+        var tableView: NSTableView?
+        var rows: [SourceBrowserRow] = []
+        var didAutoPresent = false
+
+        init(deckID: String?) {
+            self.deckID = deckID
+        }
     }
 
     func install() {
@@ -34,7 +43,7 @@ final class SourceBrowserController: NSObject, NSWindowDelegate {
             object: nil,
             queue: .main
         ) { [weak self] _ in
-            self?.reloadRows(keepingSelection: true)
+            self?.reloadAllRows(keepingSelection: true)
         }
     }
 
@@ -45,35 +54,73 @@ final class SourceBrowserController: NSObject, NSWindowDelegate {
         SourceBrowserUI.registerPresentHandler(nil)
     }
 
-    func showPanel() {
-        ensurePanel()
-        panel?.makeKeyAndOrderFront(nil)
+    func showPanel(deck: String? = nil) {
+        let session = ensureSession(deckID: deck)
+        session.panel?.makeKeyAndOrderFront(nil)
         NSApp.activate(ignoringOtherApps: true)
-        reloadRows(keepingSelection: true)
+        reloadRows(session: session, keepingSelection: true)
     }
 
     private func handlePresent(_ configuration: SourceBrowserConfiguration) {
+        let session = ensureSession(deckID: configuration.deckID)
+        let state = selectionState(for: configuration.deckID)
         if let folder = configuration.mediaFolderURL {
-            catalog.mediaFolderURL = folder
-        } else if catalog.mediaFolderURL == nil {
-            catalog.mediaFolderURL = catalog.selectionState.mediaFolderURL ?? MacSourceCatalog.defaultMediaFolder()
+            state.mediaFolderURL = folder
+            if configuration.deckID == nil {
+                catalog.mediaFolderURL = folder
+            }
+        } else if state.mediaFolderURL == nil {
+            let fallback = catalog.mediaFolderURL ?? MacSourceCatalog.defaultMediaFolder()
+            state.mediaFolderURL = fallback
         }
-        if !didAutoPresent {
-            didAutoPresent = true
-            showPanel()
+        if configuration.deckID == nil, catalog.mediaFolderURL == nil {
+            catalog.mediaFolderURL = state.mediaFolderURL ?? MacSourceCatalog.defaultMediaFolder()
         }
+        if !session.didAutoPresent {
+            session.didAutoPresent = true
+            session.panel?.makeKeyAndOrderFront(nil)
+            NSApp.activate(ignoringOtherApps: true)
+        }
+        reloadRows(session: session, keepingSelection: true)
     }
 
-    private func ensurePanel() {
-        guard panel == nil else { return }
+    private func sessionKey(for deckID: String?) -> String {
+        deckID ?? "main"
+    }
 
+    private func selectionState(for deckID: String?) -> SourceSelectionState {
+        if let deckID {
+            return SourceDeckRegistry.selectionState(for: deckID)
+        }
+        return catalog.selectionState
+    }
+
+    private func panelTitle(for deckID: String?) -> String {
+        if let deckID {
+            return "Sources (Deck \(deckID))"
+        }
+        return "Sources"
+    }
+
+    private func ensureSession(deckID: String?) -> DeckSession {
+        let key = sessionKey(for: deckID)
+        if let existing = sessions[key] {
+            return existing
+        }
+        let session = DeckSession(deckID: deckID)
+        sessions[key] = session
+        buildPanel(for: session)
+        return session
+    }
+
+    private func buildPanel(for session: DeckSession) {
         let panel = NSPanel(
             contentRect: NSRect(x: 0, y: 0, width: 420, height: 360),
             styleMask: [.titled, .closable, .utilityWindow],
             backing: .buffered,
             defer: false
         )
-        panel.title = "Sources"
+        panel.title = panelTitle(for: session.deckID)
         panel.isFloatingPanel = true
         panel.hidesOnDeactivate = false
         panel.delegate = self
@@ -94,7 +141,7 @@ final class SourceBrowserController: NSObject, NSWindowDelegate {
         table.addTableColumn(column)
         table.columnAutoresizingStyle = .uniformColumnAutoresizingStyle
         scroll.documentView = table
-        tableView = table
+        session.tableView = table
 
         let stack = NSStackView(views: [scroll])
         stack.orientation = .vertical
@@ -120,8 +167,12 @@ final class SourceBrowserController: NSObject, NSWindowDelegate {
         buttonBar.addArrangedSubview(makeButton(title: "Refresh", action: #selector(refresh(_:))))
         stack.addArrangedSubview(buttonBar)
 
-        self.panel = panel
-        reloadRows(keepingSelection: false)
+        session.panel = panel
+        reloadRows(session: session, keepingSelection: false)
+    }
+
+    private func session(for tableView: NSTableView) -> DeckSession? {
+        sessions.values.first(where: { $0.tableView === tableView })
     }
 
     private func makeButton(title: String, action: Selector) -> NSButton {
@@ -131,35 +182,43 @@ final class SourceBrowserController: NSObject, NSWindowDelegate {
     }
 
     @objc private func refresh(_ sender: Any?) {
-        reloadRows(keepingSelection: true)
+        reloadAllRows(keepingSelection: true)
     }
 
     @objc private func chooseFolder(_ sender: Any?) {
+        let deckID = senderDeckID(sender)
         let panel = NSOpenPanel()
         panel.canChooseFiles = false
         panel.canChooseDirectories = true
         panel.allowsMultipleSelection = false
-        panel.directoryURL = catalog.mediaFolderURL
+        panel.directoryURL = selectionState(for: deckID).mediaFolderURL ?? catalog.mediaFolderURL
         guard panel.runModal() == .OK, let url = panel.url else { return }
-        catalog.mediaFolderURL = url
-        reloadRows(keepingSelection: false)
+        selectionState(for: deckID).mediaFolderURL = url
+        if deckID == nil {
+            catalog.mediaFolderURL = url
+        }
+        reloadAllRows(keepingSelection: false)
     }
 
     @objc private func chooseFile(_ sender: Any?) {
+        let deckID = senderDeckID(sender)
         let panel = NSOpenPanel()
         panel.canChooseFiles = true
         panel.canChooseDirectories = false
         panel.allowsMultipleSelection = false
-        panel.directoryURL = catalog.mediaFolderURL
+        panel.directoryURL = selectionState(for: deckID).mediaFolderURL ?? catalog.mediaFolderURL
         panel.allowedContentTypes = [.movie, .mpeg4Movie, .quickTimeMovie, .video]
         guard panel.runModal() == .OK, let url = panel.url else { return }
-        catalog.selectionState.selection = .source(
+        selectionState(for: deckID).selection = .source(
             SourceDescriptor(displayName: url.lastPathComponent, kind: .localFile(url))
         )
-        reloadRows(keepingSelection: true)
+        if let session = sessions[sessionKey(for: deckID)] {
+            reloadRows(session: session, keepingSelection: true)
+        }
     }
 
     @objc private func addManualInterAppInput(_ sender: Any?) {
+        let deckID = senderDeckID(sender)
         let alert = NSAlert()
         alert.messageText = "Inter-app server name"
         alert.informativeText = "Enter the published server name from the sending app."
@@ -171,39 +230,63 @@ final class SourceBrowserController: NSObject, NSWindowDelegate {
         guard alert.runModal() == .alertFirstButtonReturn else { return }
         let name = field.stringValue.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !name.isEmpty else { return }
-        catalog.selectionState.selection = .source(
+        selectionState(for: deckID).selection = .source(
             SourceDescriptor(displayName: name, kind: .interAppInput(serverName: name))
         )
-        reloadRows(keepingSelection: true)
+        if let session = sessions[sessionKey(for: deckID)] {
+            reloadRows(session: session, keepingSelection: true)
+        }
     }
 
-    private func reloadRows(keepingSelection: Bool) {
+    private func senderDeckID(_ sender: Any?) -> String? {
+        guard let button = sender as? NSView else { return nil }
+        var view: NSView? = button
+        while let current = view {
+            if let panel = current.window as? NSPanel,
+               let session = sessions.values.first(where: { $0.panel === panel })
+            {
+                return session.deckID
+            }
+            view = current.superview
+        }
+        return nil
+    }
+
+    private func reloadAllRows(keepingSelection: Bool) {
         catalog.refresh()
+        for session in sessions.values {
+            reloadRows(session: session, keepingSelection: keepingSelection)
+        }
+    }
+
+    private func reloadRows(session: DeckSession, keepingSelection: Bool) {
+        catalog.refresh()
+        let state = selectionState(for: session.deckID)
         var next: [SourceBrowserRow] = [.none]
         for entry in catalog.sources {
             next.append(.catalogEntry(entry.descriptor))
         }
-        if case .source(let descriptor) = catalog.selectionState.selection,
+        if case .source(let descriptor) = state.selection,
            case .interAppInput(let name) = descriptor.kind,
            !catalog.sources.contains(where: { $0.id == descriptor.id })
         {
             next.append(.manualInterAppInput(name: name))
         }
 
-        rows = next
-        tableView?.reloadData()
-        syncTableSelectionToCatalog()
+        session.rows = next
+        session.tableView?.reloadData()
+        syncTableSelection(session: session)
 
         if !keepingSelection {
-            catalog.selectionState.selection = .none
-            syncTableSelectionToCatalog()
+            state.selection = .none
+            syncTableSelection(session: session)
         }
     }
 
-    private func syncTableSelectionToCatalog() {
-        guard let tableView else { return }
-        let selection = catalog.selectionState.selection
-        let index = rows.firstIndex { row in
+    private func syncTableSelection(session: DeckSession) {
+        guard let tableView = session.tableView else { return }
+        let selection = selectionState(for: session.deckID).selection
+        let index = session.rows.firstIndex { row in
             switch (row, selection) {
             case (.none, .none):
                 return true
@@ -221,14 +304,14 @@ final class SourceBrowserController: NSObject, NSWindowDelegate {
         tableView.selectRowIndexes(IndexSet(integer: index), byExtendingSelection: false)
     }
 
-    private func applySelection(for row: SourceBrowserRow) {
+    private func applySelection(for row: SourceBrowserRow, deckID: String?) {
         switch row {
         case .none:
-            catalog.selectionState.selection = .none
+            selectionState(for: deckID).selection = .none
         case .catalogEntry(let descriptor):
-            catalog.selectionState.selection = .source(descriptor)
+            selectionState(for: deckID).selection = .source(descriptor)
         case .manualInterAppInput(let name):
-            catalog.selectionState.selection = .source(
+            selectionState(for: deckID).selection = .source(
                 SourceDescriptor(displayName: name, kind: .interAppInput(serverName: name))
             )
         }
@@ -236,9 +319,12 @@ final class SourceBrowserController: NSObject, NSWindowDelegate {
 }
 
 extension SourceBrowserController: NSTableViewDataSource, NSTableViewDelegate {
-    func numberOfRows(in tableView: NSTableView) -> Int { rows.count }
+    func numberOfRows(in tableView: NSTableView) -> Int {
+        session(for: tableView)?.rows.count ?? 0
+    }
 
     func tableView(_ tableView: NSTableView, viewFor tableColumn: NSTableColumn?, row: Int) -> NSView? {
+        guard let session = session(for: tableView) else { return nil }
         let id = NSUserInterfaceItemIdentifier("cell")
         let cell = tableView.makeView(withIdentifier: id, owner: self) as? NSTableCellView
             ?? NSTableCellView()
@@ -254,15 +340,16 @@ extension SourceBrowserController: NSTableViewDataSource, NSTableViewDelegate {
                 field.centerYAnchor.constraint(equalTo: cell.centerYAnchor),
             ])
         }
-        cell.textField?.stringValue = displayName(for: rows[row])
+        cell.textField?.stringValue = displayName(for: session.rows[row])
         return cell
     }
 
     func tableViewSelectionDidChange(_ notification: Notification) {
-        guard let table = notification.object as? NSTableView else { return }
+        guard let table = notification.object as? NSTableView,
+              let session = session(for: table) else { return }
         let index = table.selectedRow
-        guard index >= 0, index < rows.count else { return }
-        applySelection(for: rows[index])
+        guard index >= 0, index < session.rows.count else { return }
+        applySelection(for: session.rows[index], deckID: session.deckID)
     }
 
     private func displayName(for row: SourceBrowserRow) -> String {

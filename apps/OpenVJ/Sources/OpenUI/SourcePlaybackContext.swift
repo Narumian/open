@@ -6,15 +6,24 @@ import Foundation
 /// `ViewRenderContext` per frame (or export step). Child views read/write selection
 /// through `context.sourcePlayback` during `render` / `renderLeaf`.
 public struct SourcePlaybackContext {
-    /// When nil, reads/writes go through `SourceCatalogRegistry.selectionState`.
+    /// When set, reads/writes use `SourceDeckRegistry` for this deck.
+    public var deckID: String?
+    /// When nil (and `deckID` is nil), reads/writes go through `SourceCatalogRegistry.selectionState`.
     public var selectionState: SourceSelectionState?
 
-    public init(selectionState: SourceSelectionState? = nil) {
+    public init(deckID: String? = nil, selectionState: SourceSelectionState? = nil) {
+        self.deckID = deckID
         self.selectionState = selectionState
     }
 
     public var resolvedSelectionState: SourceSelectionState {
-        selectionState ?? SourceCatalogRegistry.selectionState
+        if let selectionState {
+            return selectionState
+        }
+        if let deckID {
+            return SourceDeckRegistry.selectionState(for: deckID)
+        }
+        return SourceCatalogRegistry.selectionState
     }
 
     public var selection: SourceSelection {

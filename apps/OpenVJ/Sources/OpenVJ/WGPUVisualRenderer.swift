@@ -352,7 +352,8 @@ public final class WGPUVisualRenderer: VisualRenderer {
                     applyInterAppPublishConfiguration(
                         PublisherConfiguration(
                             serverName: configuration.serverName,
-                            enabled: configuration.enabled
+                            enabled: configuration.enabled,
+                            textureBus: configuration.textureBus
                         )
                     )
                 },

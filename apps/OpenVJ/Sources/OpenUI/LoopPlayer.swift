@@ -39,6 +39,6 @@ extension LoopPlayer: ViewRepresentable {
         if let fileURL {
             return .video(fileURL: fileURL.absoluteString)
         }
-        return .sourceBrowser
+        return .sourceBrowser(deckID: nil, mediaFolderURL: nil)
     }
 }

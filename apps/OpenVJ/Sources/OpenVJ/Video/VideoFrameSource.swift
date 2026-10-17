@@ -3,7 +3,7 @@ import CoreVideo
 import Foundation
 
 /// Decodes a local file with `AVPlayer` + `AVPlayerItemVideoOutput` (BGRA pixel buffers).
-final class VideoFrameSource {
+public final class VideoFrameSource {
     let fileURL: URL
 
     private let player: AVPlayer
@@ -12,7 +12,7 @@ final class VideoFrameSource {
     private var didLogNonFileURL = false
     var loops = true
 
-    init?(fileURL: URL) {
+    public init?(fileURL: URL) {
         guard fileURL.isFileURL else { return nil }
         self.fileURL = fileURL
 
@@ -51,7 +51,7 @@ final class VideoFrameSource {
         Float(CMTimeGetSeconds(player.currentTime()))
     }
 
-    func play() {
+    public func play() {
         player.play()
     }
 
@@ -73,7 +73,7 @@ final class VideoFrameSource {
         player.play()
     }
 
-    func copyCurrentPixelBuffer() -> CVPixelBuffer? {
+    public func copyCurrentPixelBuffer() -> CVPixelBuffer? {
         guard fileURL.isFileURL else {
             if !didLogNonFileURL {
                 didLogNonFileURL = true

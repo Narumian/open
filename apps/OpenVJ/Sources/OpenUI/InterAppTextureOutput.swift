@@ -8,9 +8,12 @@ public struct InterAppTextureOutput: View {
     public typealias Body = Never
 
     public let serverName: String
+    /// GPU bus from `OffscreenTexture("…")` to publish (nil → swapchain / full frame).
+    public let textureBus: String?
 
-    public init(_ label: String) {
+    public init(_ label: String, bus: String? = nil) {
         serverName = label
+        textureBus = bus
     }
 
     public var body: Never {
@@ -18,12 +21,12 @@ public struct InterAppTextureOutput: View {
     }
 
     public func renderLeaf(in context: inout ViewRenderContext) {
-        context.requestInterAppTextureOutput(serverName: serverName)
+        context.requestInterAppTextureOutput(serverName: serverName, textureBus: textureBus)
     }
 }
 
 extension InterAppTextureOutput: ViewRepresentable {
-    var viewNode: ViewNode { .interAppTextureOutput(serverName: serverName) }
+    var viewNode: ViewNode { .interAppTextureOutput(serverName: serverName, textureBus: textureBus) }
 }
 
 /// Example scene: publish frames under a named server, then draw `SomeVisual`.
