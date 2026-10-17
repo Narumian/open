@@ -2,7 +2,7 @@ import CWGPU
 import Foundation
 
 /// Shared GPU frame bus for sending visuals to other macOS apps (Syphon, future NDI, etc.).
-public enum InterAppTexture {
+public enum InterAppTextureRegistry {
     public typealias PublisherFactory = (_ configuration: PublisherConfiguration) -> InterAppTexturePublisher?
 
     private static var publisherFactory: PublisherFactory?

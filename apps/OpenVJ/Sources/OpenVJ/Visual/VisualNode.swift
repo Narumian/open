@@ -5,6 +5,7 @@ public enum VisualNode: Equatable, Sendable {
     case empty
     case generativeShader
     case waveBody(WaveMode, explicitTime: Float?)
+    case interAppPublish(serverName: String)
     case group([VisualNode])
 }
 

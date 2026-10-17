@@ -39,7 +39,7 @@ public protocol VisualSceneHosting: VisualRenderer {
 
 extension WGPUVisualRenderer: VisualSceneHosting {}
 
-/// Registry and factory for `VisualRenderer` backends (default: WebGPU when linked).
+/// Registry and factory for `VisualRenderer` backends (default: WebGPU when linked). Mirrors `InterAppTextureRegistry`.
 public enum VisualRender {
     public typealias RendererFactory = (_ attachment: VisualSurfaceAttachment) -> VisualRenderer?
 

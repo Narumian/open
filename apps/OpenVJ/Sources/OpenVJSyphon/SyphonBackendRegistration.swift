@@ -3,8 +3,8 @@ import OpenVJ
 
 public enum SyphonBackendRegistration {
     public static func registerIfNeeded() {
-        guard !InterAppTexture.isBackendRegistered else { return }
-        InterAppTexture.registerPublisherFactory { configuration in
+        guard !InterAppTextureRegistry.isBackendRegistered else { return }
+        InterAppTextureRegistry.registerPublisherFactory { configuration in
             SyphonInterAppTexturePublisher(configuration: configuration)
         }
     }

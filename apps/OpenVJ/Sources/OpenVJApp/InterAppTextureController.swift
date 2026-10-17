@@ -25,7 +25,7 @@ final class InterAppTextureController {
         if enabled {
             #if canImport(OpenVJSyphon)
             if publisher == nil {
-                publisher = InterAppTexture.makePublisher(configuration: .init(serverName: "OpenVJ", enabled: true))
+                publisher = InterAppTextureRegistry.makePublisher(configuration: .init(serverName: "OpenVJ", enabled: true))
             }
             publisher?.isEnabled = true
             renderer.setInterAppPublisher(publisher)

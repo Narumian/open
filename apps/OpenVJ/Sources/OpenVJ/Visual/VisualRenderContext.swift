@@ -7,16 +7,24 @@ public struct VisualRenderContext {
     private var waveLayerIndex: Int
     private let drawShaderLegacy: () -> Void
     private let drawWaveBodyImpl: (WaveMode, Float, Float) -> Void
+    private let applyInterAppPublish: (PublisherConfiguration) -> Void
 
     init(
         frameTime: Float,
         drawShaderLegacy: @escaping () -> Void,
-        drawWaveBody: @escaping (WaveMode, Float, Float) -> Void
+        drawWaveBody: @escaping (WaveMode, Float, Float) -> Void,
+        applyInterAppPublish: @escaping (PublisherConfiguration) -> Void
     ) {
         self.frameTime = frameTime
         waveLayerIndex = 0
         self.drawShaderLegacy = drawShaderLegacy
         drawWaveBodyImpl = drawWaveBody
+        self.applyInterAppPublish = applyInterAppPublish
+    }
+
+    /// Called by the `InterAppTexture` visual leaf during tree walk.
+    public mutating func requestInterAppPublish(serverName: String, enabled: Bool = true) {
+        applyInterAppPublish(PublisherConfiguration(serverName: serverName, enabled: enabled))
     }
 
     /// Legacy full-screen generative path (single sin-style warp, opaque).
@@ -41,6 +49,8 @@ public struct VisualRenderContext {
             drawGenerativeShader()
         case .waveBody(let mode, let explicitTime):
             drawWaveBody(mode: mode, time: explicitTime)
+        case .interAppPublish(let serverName):
+            requestInterAppPublish(serverName: serverName)
         case .group(let children):
             for child in children {
                 render(node: child)

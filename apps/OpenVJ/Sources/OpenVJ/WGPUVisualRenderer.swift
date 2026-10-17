@@ -22,6 +22,8 @@ public final class WGPUVisualRenderer: VisualRenderer {
     private var interAppCopyWidth: UInt32 = 0
     private var interAppCopyHeight: UInt32 = 0
     private let startTime = CFAbsoluteTimeGetCurrent()
+    private var interAppPublisherServerName: String?
+    private static var didLogMissingInterAppBackend = false
 
     /// Optional inter-app publisher (Syphon when `OpenVJSyphon` is linked). Off by default on the publisher itself.
     public var interAppPublisher: InterAppTexturePublisher?
@@ -113,11 +115,51 @@ public final class WGPUVisualRenderer: VisualRenderer {
     public func setInterAppPublisher(_ publisher: InterAppTexturePublisher?) {
         interAppPublisher?.detach()
         interAppPublisher = publisher
+        if publisher == nil {
+            interAppPublisherServerName = nil
+        }
         interAppPublisher?.attach(device: device, queue: queue)
         if configuredWidth > 0, configuredHeight > 0 {
             interAppPublisher?.resize(width: configuredWidth, height: configuredHeight)
         }
         syncInterAppCopyTexture()
+    }
+
+    /// Applies `InterAppTexture` visual leaf configuration for the current frame.
+    func applyInterAppPublishConfiguration(_ configuration: PublisherConfiguration) {
+        guard configuration.enabled else {
+            setInterAppPublisher(nil)
+            return
+        }
+
+        if let interAppPublisher,
+           interAppPublisherServerName == nil || interAppPublisherServerName == configuration.serverName
+        {
+            interAppPublisherServerName = configuration.serverName
+            interAppPublisher.isEnabled = true
+            syncInterAppCopyTexture()
+            return
+        }
+
+        interAppPublisher?.detach()
+        interAppPublisher = nil
+        interAppPublisherServerName = nil
+
+        if let publisher = InterAppTextureRegistry.makePublisher(configuration: configuration) {
+            interAppPublisher = publisher
+            interAppPublisherServerName = configuration.serverName
+            interAppPublisher?.attach(device: device, queue: queue)
+            if configuredWidth > 0, configuredHeight > 0 {
+                interAppPublisher?.resize(width: configuredWidth, height: configuredHeight)
+            }
+            syncInterAppCopyTexture()
+        } else if !Self.didLogMissingInterAppBackend {
+            Self.didLogMissingInterAppBackend = true
+            fputs(
+                "[OpenVJ] Inter-app texture publish requested but no backend is linked (e.g. OpenVJSyphon). Run Scripts/fetch-syphon.sh and rebuild.\n",
+                stderr
+            )
+        }
     }
 
     private func syncInterAppCopyTexture() {
@@ -214,6 +256,9 @@ public final class WGPUVisualRenderer: VisualRenderer {
                     wgpuRenderPassEncoderSetPipeline(pass, drawPipeline)
                     wgpuRenderPassEncoderSetBindGroup(pass, 0, drawBindGroup, 0, nil)
                     wgpuRenderPassEncoderDraw(pass, 3, 1, 0, 0)
+                },
+                applyInterAppPublish: { [self] configuration in
+                    applyInterAppPublishConfiguration(configuration)
                 }
             )
             rootVisual.render(in: &visualContext)

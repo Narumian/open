@@ -6,7 +6,7 @@ Rendering uses a `CAMetalLayer` surface with wgpu’s Metal backend — not a di
 
 ## Renderer abstraction
 
-The app depends on **`VisualRenderer`**, not on WebGPU types directly. Backends are created through **`VisualRender.makeRenderer(attachment:)`** (same registry pattern as `InterAppTexture`).
+The app depends on **`VisualRenderer`**, not on WebGPU types directly. Backends are created through **`VisualRender.makeRenderer(attachment:)`** (same registry pattern as `InterAppTextureRegistry`).
 
 | Type | Role |
 |------|------|
@@ -34,7 +34,10 @@ Generative content is described with a SwiftUI-like **`Visual`** protocol: recur
 | `GroupVisual` | Transparent container for builder content |
 | `EmptyVisual` | No-op leaf |
 | `AnyVisual` | Type erasure for renderer storage |
+| `InterAppTexture` | Leaf: request inter-app publish (`InterAppTexture("OpenVJ")`) — no draw |
+| `SomeVisual` | Demo sin wave leaf for publish examples |
 | `OpenVJDefaultScene` | Built-in root scene (`Add { SinBody(); TanBody().time(...) }`) |
+| `OpenVJInterAppTextureScene` | `Add { InterAppTexture("OpenVJ"); SomeVisual() }` |
 | `OpenVJTimedDemoScene` | Same stack with an explicit `time` parameter |
 | `VisualSceneHosting` | `VisualRenderer` + `rootVisual` (`WGPUVisualRenderer`) |
 
@@ -50,6 +53,17 @@ Add {
 ```
 
 Use `OpenVJSceneTime.current` for `t` when you want the renderer’s frame clock, or pass your own `Float` (see `OpenVJTimedDemoScene`).
+
+Inter-app publish from the scene graph (backend-agnostic; Syphon only when `OpenVJSyphon` is linked):
+
+```swift
+Add {
+    InterAppTexture("OpenVJ")
+    SomeVisual()
+}
+```
+
+During tree walk, `InterAppTexture` configures `InterAppTexturePublisher` via `InterAppTextureRegistry.makePublisher(configuration:)` — the renderer does not call Syphon directly. Without a linked backend, publish is a no-op and OpenVJ logs once.
 
 `WGPUVisualRenderer.rootVisual` is traversed each frame; assign `AnyVisual(yourScene)` on a `VisualSceneHosting` renderer to swap scenes without touching the AppKit shell.
 
@@ -69,11 +83,12 @@ Creates `Vendor/CWGPU.xcframework` (gitignored).
 
 ## Inter-app texture sharing (optional)
 
-OpenVJ exposes a small **`InterAppTexture`** API in the `OpenVJ` library:
+OpenVJ exposes inter-app texture sharing in the `OpenVJ` library:
 
 | Type | Role |
 |------|------|
-| `InterAppTexture` | Registry + `makePublisher(configuration:)` |
+| `InterAppTexture` | Visual leaf — request publish with a server name |
+| `InterAppTextureRegistry` | Registry + `makePublisher(configuration:)` |
 | `InterAppTexturePublisher` | Publish WGPU frames to other apps |
 | `InterAppTextureSubscriber` | Stub for future receive path |
 | `OpenVJSyphon` | macOS Syphon backend (optional target) |
