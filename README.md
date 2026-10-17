@@ -2,7 +2,7 @@
 
 **JSwift** は JavaScript 上で Swift 風 DSL を動かすエンジン（パーサ → JS 生成 → ブラウザ/Node で実行）です。Apple Swift の互換実行ではなく、**厳選した Swift 風セマンティクス**を ECMAScript に載せるプロジェクトです。
 
-- 構想・フェーズ: [Project ドキュメント `jswift.md`](https://github.com/Narumian/open/blob/main/docs/SPEC.md)（文法 v0 は同リポの `docs/SPEC.md`）
+- 構想・アーキテクチャ・フェーズ: [docs/SPEC.md](./docs/SPEC.md)（文法 v0）。全体コンセプトは Open Project の `jswift.md`。
 - 公式リポ: https://github.com/Narumian/open
 
 ## Phase 1（このリポ）
