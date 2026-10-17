@@ -25,7 +25,13 @@ public final class WGPUVisualRenderer {
 
     private var configuredWidth: UInt32 = 0
     private var configuredHeight: UInt32 = 0
+    private var interAppCopyTexture: WGPUTexture?
+    private var interAppCopyWidth: UInt32 = 0
+    private var interAppCopyHeight: UInt32 = 0
     private let startTime = CFAbsoluteTimeGetCurrent()
+
+    /// Optional inter-app publisher (Syphon when `OpenVJSyphon` is linked). Off by default on the publisher itself.
+    public var interAppPublisher: InterAppTexturePublisher?
 
     public init?(metalLayer: UnsafeMutableRawPointer) {
         installWGPULoggingOnce()
@@ -70,9 +76,12 @@ public final class WGPUVisualRenderer {
         self.bindGroupLayout = bindGroupLayout
         self.bindGroup = bindGroup
         self.pipeline = pipeline
+        interAppPublisher?.attach(device: device, queue: queue)
     }
 
     deinit {
+        releaseInterAppCopyTexture()
+        interAppPublisher?.detach()
         wgpuRenderPipelineRelease(pipeline)
         wgpuBindGroupRelease(bindGroup)
         wgpuBindGroupLayoutRelease(bindGroupLayout)
@@ -92,7 +101,7 @@ public final class WGPUVisualRenderer {
         var configuration = WGPUSurfaceConfiguration()
         configuration.device = device
         configuration.format = Self.surfaceFormat
-        configuration.usage = WGPUTextureUsage_RenderAttachment
+        configuration.usage = WGPUTextureUsage_RenderAttachment | WGPUTextureUsage_CopySrc
         configuration.width = width
         configuration.height = height
         configuration.alphaMode = WGPUCompositeAlphaMode_Opaque
@@ -100,7 +109,27 @@ public final class WGPUVisualRenderer {
         wgpuSurfaceConfigure(surface, &configuration)
         configuredWidth = width
         configuredHeight = height
+        syncInterAppCopyTexture()
+        interAppPublisher?.resize(width: width, height: height)
         return true
+    }
+
+    public func setInterAppPublisher(_ publisher: InterAppTexturePublisher?) {
+        interAppPublisher?.detach()
+        interAppPublisher = publisher
+        interAppPublisher?.attach(device: device, queue: queue)
+        if configuredWidth > 0, configuredHeight > 0 {
+            interAppPublisher?.resize(width: configuredWidth, height: configuredHeight)
+        }
+        syncInterAppCopyTexture()
+    }
+
+    private func syncInterAppCopyTexture() {
+        guard interAppPublisher?.isEnabled == true, configuredWidth > 0, configuredHeight > 0 else {
+            releaseInterAppCopyTexture()
+            return
+        }
+        ensureInterAppCopyTexture(width: configuredWidth, height: configuredHeight)
     }
 
     public func render() -> WGPUVisualFrameStatus {
@@ -170,12 +199,62 @@ public final class WGPUVisualRenderer {
             return true
         }
 
-        guard encoded, let commandBuffer = wgpuCommandEncoderFinish(encoder, nil) else { return .skipped }
+        guard encoded else { return .skipped }
+
+        if let interAppCopyTexture {
+            var source = WGPUTexelCopyTextureInfo()
+            source.texture = texture
+            source.mipLevel = 0
+            source.origin = WGPUOrigin3D(x: 0, y: 0, z: 0)
+            source.aspect = WGPUTextureAspect_All
+            var destination = source
+            destination.texture = interAppCopyTexture
+            var copySize = WGPUExtent3D(width: configuredWidth, height: configuredHeight, depthOrArrayLayers: 1)
+            wgpuCommandEncoderCopyTextureToTexture(encoder, &source, &destination, &copySize)
+        }
+
+        guard let commandBuffer = wgpuCommandEncoderFinish(encoder, nil) else { return .skipped }
         var submitted: WGPUCommandBuffer? = commandBuffer
         withUnsafePointer(to: &submitted) { wgpuQueueSubmit(queue, 1, $0) }
         wgpuCommandBufferRelease(commandBuffer)
+        _ = wgpuDevicePoll(device, 0, nil)
+
+        if let interAppCopyTexture, let interAppPublisher, interAppPublisher.isEnabled {
+            interAppPublisher.publish(
+                texture: interAppCopyTexture,
+                width: configuredWidth,
+                height: configuredHeight
+            )
+        }
+
         present()
         return okStatus
+    }
+
+    private func ensureInterAppCopyTexture(width: UInt32, height: UInt32) {
+        guard width > 0, height > 0 else { return }
+        if interAppCopyTexture != nil, interAppCopyWidth == width, interAppCopyHeight == height { return }
+
+        releaseInterAppCopyTexture()
+        var descriptor = WGPUTextureDescriptor()
+        descriptor.usage = WGPUTextureUsage_CopyDst | WGPUTextureUsage_TextureBinding
+        descriptor.dimension = WGPUTextureDimension_2D
+        descriptor.size = WGPUExtent3D(width: width, height: height, depthOrArrayLayers: 1)
+        descriptor.format = Self.surfaceFormat
+        descriptor.mipLevelCount = 1
+        descriptor.sampleCount = 1
+        interAppCopyTexture = wgpuDeviceCreateTexture(device, &descriptor)
+        interAppCopyWidth = width
+        interAppCopyHeight = height
+    }
+
+    private func releaseInterAppCopyTexture() {
+        if let interAppCopyTexture {
+            wgpuTextureRelease(interAppCopyTexture)
+            self.interAppCopyTexture = nil
+        }
+        interAppCopyWidth = 0
+        interAppCopyHeight = 0
     }
 
     private static let shaderSource = """

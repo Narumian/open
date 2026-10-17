@@ -6,6 +6,7 @@ final class VisualView: NSView {
     private var renderer: WGPUVisualRenderer?
     private var timer: Timer?
     private var lastDrawableSize = CGSize.zero
+    private let interAppController = InterAppTextureController()
 
     override func makeBackingLayer() -> CALayer { CAMetalLayer() }
 
@@ -54,6 +55,8 @@ final class VisualView: NSView {
             fatalError("WebGPU renderer failed to initialize.")
         }
         self.renderer = renderer
+        interAppController.renderer = renderer
+        interAppController.bootstrapIfNeeded()
         updateDrawableSize()
 
         let timer = Timer(timeInterval: 1.0 / 60.0, repeats: true) { [weak self] _ in
@@ -88,4 +91,10 @@ final class VisualView: NSView {
         guard window != nil, !isHidden, bounds.width > 0, bounds.height > 0 else { return }
         _ = renderer?.render()
     }
+
+    func setInterAppPublishing(_ enabled: Bool) {
+        interAppController.setPublishing(enabled: enabled)
+    }
+
+    var isInterAppPublishing: Bool { interAppController.isPublishing }
 }
