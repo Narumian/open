@@ -59,6 +59,7 @@ struct OpenVJRenderCLI {
             exit(1)
         }
 
+        let headlessSession = HeadlessRenderSession(sceneName: sceneName)
         renderer.rootView = OpenVJSceneEnvironment.rootView(named: sceneName)
         guard renderer.configure(width: width, height: height) else {
             fputs("[OpenVJRender] configure(\(width), \(height)) failed.\n", stderr)
@@ -81,9 +82,26 @@ struct OpenVJRenderCLI {
             fputs("[OpenVJRender] Render failed with status \(lastStatus).\n", stderr)
             exit(1)
         }
-        guard let bgra = captured else {
+        guard var bgra = captured else {
             fputs("[OpenVJRender] Frame readback failed.\n", stderr)
             exit(1)
+        }
+        if let catalog = headlessSession.sourceCatalog {
+            let rows = SourceBrowserListModel.rows(from: catalog)
+            let selected = SourceBrowserListModel.selectedRowIndex(
+                in: rows,
+                selection: catalog.selectionState.selection
+            )
+            SourceBrowserChromeCompositor.composite(
+                bgra: &bgra,
+                width: Int(width),
+                height: Int(height),
+                rows: rows,
+                selectedIndex: selected
+            )
+        }
+        if let stats = BGRA8Stats.summarize(bgra, width: Int(width), height: Int(height)) {
+            fputs("[OpenVJRender] \(stats)\n", stderr)
         }
         do {
             try BGRA8PNG.write(bgra, width: Int(width), height: Int(height), to: outputURL)
@@ -103,7 +121,7 @@ struct OpenVJRenderCLI {
 
     private static func printUsage() {
         let text = """
-        OpenVJRender — headless offscreen frame export (no window, no Source Browser UI)
+        OpenVJRender — headless offscreen frame export (CPU Sources chrome for source-browser-mixer)
 
         Usage:
           swift run OpenVJRender --output /tmp/frame.png [options]
