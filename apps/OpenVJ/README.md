@@ -39,7 +39,9 @@ Generative content is described with the **`OpenUI`** module: a SwiftUI-free **`
 | `EmptyView` | No-op leaf |
 | `AnyView` | Type erasure for renderer storage |
 | `InterAppTexture` | Leaf: request inter-app publish (`InterAppTexture("OpenVJ")`) — no draw |
-| `SomeVisual` | Demo sin wave leaf for publish examples |
+| `SomeVisual` / `Some` | Demo sin wave leaf (`typealias Some = SomeVisual`) |
+| `SourceBrowser` | Leaf: macOS source picker + draws selected file / Syphon input |
+| `OpenVJSourceBrowserMixerScene` | `Mixer { SourceBrowser(); Some() }` example |
 | `OpenVJDefaultScene` | Built-in root scene (`Add { SinBody(); TanBody().time(...) }`) |
 | `OpenVJInterAppTextureScene` | `Add { InterAppTexture("OpenVJ"); SomeVisual() }` |
 | `OpenVJLiveScene` | `Add { InterAppTexture("OpenVJ"); Mixer { SinBody(); TanBody() } }` — used when Syphon is on at launch |
@@ -116,6 +118,30 @@ Mixer {
 Syphon-first roadmap and future Spout/NDI backends: [docs/inter-app-texture.md](../../docs/inter-app-texture.md).
 
 `WGPUVisualRenderer.rootView` is traversed each frame; assign `AnyView(yourScene)` on a `ViewSceneHosting` renderer to swap scenes without touching the AppKit shell.
+
+### Source browser (macOS, v0)
+
+OpenUI declares the leaf; **AppKit** UI lives in `OpenVJApp` (`SourceBrowserController`).
+
+```swift
+Mixer {
+    SourceBrowser()
+    Some()
+}
+```
+
+**v0 behavior:**
+
+1. First time the scene graph walks a `SourceBrowser` leaf, the floating **Sources** panel opens (or use **View → Source Browser…**, ⇧⌘B).
+2. The panel lists video files in your Movies folder (or **Choose Folder…** / **Choose File…**).
+3. When `OpenVJSyphon` is linked, announced Syphon servers appear; **Add Syphon…** accepts a manual server name.
+4. Selection is stored in `SourceBrowserState.shared`. Each frame, `SourceBrowser` draws the active choice (`Video` for local files, `InterAppTextureInput` for Syphon) at its mixer layer weight; `Some()` keeps a generative sin layer in the mix.
+
+Launch with the example scene as root:
+
+```bash
+OPEN_VJ_SOURCE_BROWSER=1 .build/debug/OpenVJApp
+```
 
 ## Requirements
 

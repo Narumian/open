@@ -8,6 +8,8 @@ public enum ViewNode: Equatable, Sendable {
     case interAppPublish(serverName: String)
     case interAppSubscribe(serverName: String)
     case video(fileURL: String)
+    /// Source picker leaf (draws from `SourceBrowserState` during walk).
+    case sourceBrowser
     /// Sequential stack (`Add`): first child full opacity, later layers ~55%.
     case group([ViewNode])
     /// Equal-weight mix (`Mixer`): each child uses opacity `1 / N`.

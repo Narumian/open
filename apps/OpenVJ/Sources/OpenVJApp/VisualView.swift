@@ -8,6 +8,7 @@ final class VisualView: NSView {
     private var timer: Timer?
     private var lastDrawableSize = CGSize.zero
     private let interAppController = InterAppTextureController()
+    private let sourceBrowserController = SourceBrowserController()
 
     override func makeBackingLayer() -> CALayer { CAMetalLayer() }
 
@@ -58,9 +59,14 @@ final class VisualView: NSView {
         }
         self.renderer = renderer
         interAppController.bootstrapIfNeeded()
-        if InterAppTextureSettings.syphonRequestedAtLaunch, let wgpu = renderer as? WGPUVisualRenderer {
-            wgpu.rootView = AnyView(OpenVJLiveScene())
-            wgpu.sceneInterAppPublishSuppressed = false
+        sourceBrowserController.install()
+        if let wgpu = renderer as? WGPUVisualRenderer {
+            if SourceBrowserSettings.requestedAtLaunch {
+                wgpu.rootView = AnyView(OpenVJSourceBrowserMixerScene())
+            } else if InterAppTextureSettings.syphonRequestedAtLaunch {
+                wgpu.rootView = AnyView(OpenVJLiveScene())
+                wgpu.sceneInterAppPublishSuppressed = false
+            }
         }
         updateDrawableSize()
 
@@ -107,5 +113,9 @@ final class VisualView: NSView {
     var isInterAppPublishing: Bool {
         guard let wgpu = renderer as? WGPUVisualRenderer else { return false }
         return !wgpu.sceneInterAppPublishSuppressed
+    }
+
+    func showSourceBrowser() {
+        sourceBrowserController.showPanel()
     }
 }

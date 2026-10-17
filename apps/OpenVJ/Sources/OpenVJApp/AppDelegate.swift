@@ -54,7 +54,20 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         viewMenu.addItem(syphonItem)
         syphonMenuItem = syphonItem
 
+        let sourcesItem = NSMenuItem(
+            title: "Source Browser…",
+            action: #selector(showSourceBrowser(_:)),
+            keyEquivalent: "b"
+        )
+        sourcesItem.keyEquivalentModifierMask = [.command, .shift]
+        sourcesItem.target = self
+        viewMenu.addItem(sourcesItem)
+
         NSApp.mainMenu = mainMenu
+    }
+
+    @objc private func showSourceBrowser(_ sender: Any?) {
+        visualView?.showSourceBrowser()
     }
 
     @objc private func toggleSyphonPublishing(_ sender: NSMenuItem) {

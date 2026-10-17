@@ -26,6 +26,9 @@ extension InterAppTexture: ViewRepresentable {
     var viewNode: ViewNode { .interAppPublish(serverName: serverName) }
 }
 
+/// Short name for mixer / source-browser examples (`Some()` in scene DSL).
+public typealias Some = SomeVisual
+
 /// Demo generative leaf for inter-app publish scenes.
 public struct SomeVisual: View {
     public typealias Body = Never

@@ -25,6 +25,7 @@ public struct ViewRenderContext {
     private let drawInterAppTextureInputImpl: (String, Float) -> Void
     private let applyInterAppPublish: (InterAppPublishConfiguration) -> Void
     private let applyInterAppSubscribe: (InterAppSubscribeConfiguration) -> Void
+    private let applySourceBrowser: (SourceBrowserConfiguration) -> Void
 
     public init(
         frameTime: Float,
@@ -33,7 +34,8 @@ public struct ViewRenderContext {
         drawVideo: @escaping (URL, Float) -> Void,
         drawInterAppTextureInput: @escaping (String, Float) -> Void = { _, _ in },
         applyInterAppPublish: @escaping (InterAppPublishConfiguration) -> Void,
-        applyInterAppSubscribe: @escaping (InterAppSubscribeConfiguration) -> Void = { _ in }
+        applyInterAppSubscribe: @escaping (InterAppSubscribeConfiguration) -> Void = { _ in },
+        applySourceBrowser: @escaping (SourceBrowserConfiguration) -> Void = { _ in }
     ) {
         self.frameTime = frameTime
         blendLayerIndex = 0
@@ -44,6 +46,7 @@ public struct ViewRenderContext {
         drawInterAppTextureInputImpl = drawInterAppTextureInput
         self.applyInterAppPublish = applyInterAppPublish
         self.applyInterAppSubscribe = applyInterAppSubscribe
+        self.applySourceBrowser = applySourceBrowser
     }
 
     private mutating func nextBlendLayerAlpha() -> Float {
@@ -78,6 +81,12 @@ public struct ViewRenderContext {
     /// Called by `InterAppTextureInput` during tree walk.
     public mutating func requestInterAppSubscribe(serverName: String) {
         applyInterAppSubscribe(InterAppSubscribeConfiguration(serverName: serverName))
+    }
+
+    /// Called by `SourceBrowser` during tree walk (opens / refreshes AppKit UI when registered).
+    public mutating func requestSourceBrowser(_ configuration: SourceBrowserConfiguration) {
+        applySourceBrowser(configuration)
+        SourceBrowserUI.requestPresent(configuration)
     }
 
     /// Remote inter-app texture leaf draw (`InterAppTextureInput`).
@@ -118,6 +127,16 @@ public struct ViewRenderContext {
         case .video(let fileURLString):
             if let url = URL(string: fileURLString) {
                 drawVideo(fileURL: url)
+            }
+        case .sourceBrowser:
+            requestSourceBrowser(SourceBrowserConfiguration(mediaFolderURL: SourceBrowserState.shared.mediaFolderURL))
+            switch SourceBrowserState.shared.selection {
+            case .none:
+                break
+            case .localVideo(let url):
+                drawVideo(fileURL: url)
+            case .syphonServer(let name):
+                drawInterAppTextureInput(serverName: name)
             }
         case .group(let children):
             for child in children {
