@@ -22,6 +22,9 @@ public final class WGPUVisualRenderer: VisualRenderer {
     private var interAppCopyTexture: WGPUTexture?
     private var interAppCopyWidth: UInt32 = 0
     private var interAppCopyHeight: UInt32 = 0
+    private var captureColorTexture: WGPUTexture?
+    private var captureColorWidth: UInt32 = 0
+    private var captureColorHeight: UInt32 = 0
     private let startTime = CFAbsoluteTimeGetCurrent()
     private var interAppPublisherServerName: String?
     private var videoRenderState: WGPUVideoRenderState?
@@ -87,6 +90,7 @@ public final class WGPUVisualRenderer: VisualRenderer {
     }
 
     deinit {
+        releaseCaptureColorTexture()
         releaseInterAppCopyTexture()
         interAppPublisher?.detach()
         wgpuRenderPipelineRelease(pipeline)
@@ -202,6 +206,17 @@ public final class WGPUVisualRenderer: VisualRenderer {
         let elapsed = Float(time)
         OpenVJSceneTime.current = elapsed
 
+        if captureSurfaceBGRA {
+            ensureCaptureColorTexture(width: configuredWidth, height: configuredHeight)
+            guard let captureTexture = captureColorTexture else { return (.skipped, nil) }
+            return renderFrameToTexture(
+                captureTexture,
+                elapsed: elapsed,
+                okStatus: .rendered,
+                captureSurfaceBGRA: true
+            )
+        }
+
         var surfaceTexture = WGPUSurfaceTexture()
         wgpuSurfaceGetCurrentTexture(surface, &surfaceTexture)
 
@@ -230,6 +245,20 @@ public final class WGPUVisualRenderer: VisualRenderer {
             wgpuTextureRelease(texture)
         }
 
+        return renderFrameToTexture(
+            texture,
+            elapsed: elapsed,
+            okStatus: okStatus,
+            captureSurfaceBGRA: false
+        )
+    }
+
+    private func renderFrameToTexture(
+        _ texture: WGPUTexture,
+        elapsed: Float,
+        okStatus: VisualFrameStatus,
+        captureSurfaceBGRA: Bool
+    ) -> (status: VisualFrameStatus, bgra: Data?) {
         guard let targetView = wgpuTextureCreateView(texture, nil) else { return (.skipped, nil) }
         defer { wgpuTextureViewRelease(targetView) }
         interAppInputState?.prepareFrames(surfaceWidth: configuredWidth, surfaceHeight: configuredHeight)
@@ -244,6 +273,27 @@ public final class WGPUVisualRenderer: VisualRenderer {
         attachment.storeOp = WGPUStoreOp_Store
         attachment.clearValue = WGPUColor(r: 0, g: 0, b: 0, a: 1)
 
+        let resolution = (
+            Float(configuredWidth),
+            Float(configuredHeight)
+        )
+        func writeUniforms(time: Float, waveMode: Float, layerAlpha: Float) {
+            // WGSL: time @0, vec2 resolution @8, waveMode @16, layerAlpha @20 (std140-style).
+            let uniforms: (Float, Float, Float, Float, Float, Float, Float, Float) = (
+                time,
+                0,
+                resolution.0,
+                resolution.1,
+                waveMode,
+                layerAlpha,
+                0,
+                0
+            )
+            withUnsafeBytes(of: uniforms) { bytes in
+                wgpuQueueWriteBuffer(queue, uniformBuffer, 0, bytes.baseAddress, Self.uniformStride)
+            }
+        }
+
         let encoded = withUnsafePointer(to: &attachment) { attachmentPointer -> Bool in
             var descriptor = WGPURenderPassDescriptor()
             descriptor.colorAttachmentCount = 1
@@ -251,38 +301,29 @@ public final class WGPUVisualRenderer: VisualRenderer {
             guard let pass = wgpuCommandEncoderBeginRenderPass(encoder, &descriptor) else { return false }
             let drawPipeline = pipeline
             let drawBindGroup = bindGroup
-            let resolution = (
+            wgpuRenderPassEncoderSetViewport(
+                pass,
+                0,
+                0,
                 Float(configuredWidth),
-                Float(configuredHeight)
+                Float(configuredHeight),
+                0,
+                1
             )
-            func writeUniforms(time: Float, waveMode: Float, layerAlpha: Float) {
-                let uniforms: (Float, Float, Float, Float, Float, Float, Float, Float) = (
-                    time,
-                    resolution.0,
-                    resolution.1,
-                    waveMode,
-                    layerAlpha,
-                    0,
-                    0,
-                    0
-                )
-                withUnsafeBytes(of: uniforms) { bytes in
-                    wgpuQueueWriteBuffer(queue, uniformBuffer, 0, bytes.baseAddress, Self.uniformStride)
-                }
+            func drawFullScreen() {
+                wgpuRenderPassEncoderSetPipeline(pass, drawPipeline)
+                wgpuRenderPassEncoderSetBindGroup(pass, 0, drawBindGroup, 0, nil)
+                wgpuRenderPassEncoderDraw(pass, 3, 1, 0, 0)
             }
             var visualContext = ViewRenderContext(
                 frameTime: elapsed,
                 drawShaderLegacy: {
                     writeUniforms(time: elapsed, waveMode: 0, layerAlpha: 1)
-                    wgpuRenderPassEncoderSetPipeline(pass, drawPipeline)
-                    wgpuRenderPassEncoderSetBindGroup(pass, 0, drawBindGroup, 0, nil)
-                    wgpuRenderPassEncoderDraw(pass, 3, 1, 0, 0)
+                    drawFullScreen()
                 },
                 drawWaveBody: { mode, time, layerAlpha in
                     writeUniforms(time: time, waveMode: mode.rawValue, layerAlpha: layerAlpha)
-                    wgpuRenderPassEncoderSetPipeline(pass, drawPipeline)
-                    wgpuRenderPassEncoderSetBindGroup(pass, 0, drawBindGroup, 0, nil)
-                    wgpuRenderPassEncoderDraw(pass, 3, 1, 0, 0)
+                    drawFullScreen()
                 },
                 drawVideo: { [self] fileURL, layerAlpha in
                     videoRenderState?.draw(fileURL: fileURL, layerAlpha: layerAlpha, pass: pass)
@@ -337,11 +378,13 @@ public final class WGPUVisualRenderer: VisualRenderer {
         var submitted: WGPUCommandBuffer? = commandBuffer
         withUnsafePointer(to: &submitted) { wgpuQueueSubmit(queue, 1, $0) }
         wgpuCommandBufferRelease(commandBuffer)
-        _ = wgpuDevicePoll(device, 0, nil)
+        _ = wgpuDevicePoll(device, 1, nil)
+        wgpuInstanceProcessEvents(instance)
 
         var capturedBGRA: Data?
         if captureSurfaceBGRA {
             capturedBGRA = readBGRA8Texture(
+                instance: instance,
                 device: device,
                 queue: queue,
                 texture: texture,
@@ -358,7 +401,6 @@ public final class WGPUVisualRenderer: VisualRenderer {
             )
         }
 
-        present()
         return (okStatus, capturedBGRA)
     }
 
@@ -404,6 +446,32 @@ public final class WGPUVisualRenderer: VisualRenderer {
         }
         interAppCopyWidth = 0
         interAppCopyHeight = 0
+    }
+
+    private func ensureCaptureColorTexture(width: UInt32, height: UInt32) {
+        guard width > 0, height > 0 else { return }
+        if captureColorTexture != nil, captureColorWidth == width, captureColorHeight == height { return }
+
+        releaseCaptureColorTexture()
+        var descriptor = WGPUTextureDescriptor()
+        descriptor.usage = WGPUTextureUsage_RenderAttachment | WGPUTextureUsage_CopySrc
+        descriptor.dimension = WGPUTextureDimension_2D
+        descriptor.size = WGPUExtent3D(width: width, height: height, depthOrArrayLayers: 1)
+        descriptor.format = Self.surfaceFormat
+        descriptor.mipLevelCount = 1
+        descriptor.sampleCount = 1
+        captureColorTexture = wgpuDeviceCreateTexture(device, &descriptor)
+        captureColorWidth = width
+        captureColorHeight = height
+    }
+
+    private func releaseCaptureColorTexture() {
+        if let captureColorTexture {
+            wgpuTextureRelease(captureColorTexture)
+            self.captureColorTexture = nil
+        }
+        captureColorWidth = 0
+        captureColorHeight = 0
     }
 
     private static let shaderSource = """

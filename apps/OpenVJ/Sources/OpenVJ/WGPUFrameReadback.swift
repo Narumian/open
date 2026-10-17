@@ -6,7 +6,7 @@ private final class BufferMapBox {
     var status: WGPUMapAsyncStatus = WGPUMapAsyncStatus_Error
 }
 
-func mapBufferReadSync(device: WGPUDevice, buffer: WGPUBuffer, offset: Int, size: Int) -> Data? {
+func mapBufferReadSync(instance: WGPUInstance, device: WGPUDevice, buffer: WGPUBuffer, offset: Int, size: Int) -> Data? {
     let box = BufferMapBox()
     var info = WGPUBufferMapCallbackInfo()
     info.mode = WGPUCallbackMode_AllowProcessEvents
@@ -20,13 +20,14 @@ func mapBufferReadSync(device: WGPUDevice, buffer: WGPUBuffer, offset: Int, size
     _ = wgpuBufferMapAsync(buffer, WGPUMapMode_Read, offset, size, info)
 
     var spins = 0
-    while !box.done && spins < 8192 {
-        _ = wgpuDevicePoll(device, 0, nil)
+    while !box.done && spins < 100_000 {
+        _ = wgpuDevicePoll(device, 1, nil)
+        wgpuInstanceProcessEvents(instance)
         spins += 1
     }
     guard box.done, box.status == WGPUMapAsyncStatus_Success else { return nil }
 
-    guard let mapped = wgpuBufferGetMappedRange(buffer, offset, size) else { return nil }
+    guard let mapped = wgpuBufferGetConstMappedRange(buffer, offset, size) else { return nil }
     let data = Data(bytes: mapped, count: size)
     wgpuBufferUnmap(buffer)
     return data
@@ -34,6 +35,7 @@ func mapBufferReadSync(device: WGPUDevice, buffer: WGPUBuffer, offset: Int, size
 
 /// GPU copy of a BGRA8 texture into tightly packed row-major BGRA bytes.
 func readBGRA8Texture(
+    instance: WGPUInstance,
     device: WGPUDevice,
     queue: WGPUQueue,
     texture: WGPUTexture,
@@ -75,9 +77,10 @@ func readBGRA8Texture(
     var submitted: WGPUCommandBuffer? = commandBuffer
     withUnsafePointer(to: &submitted) { wgpuQueueSubmit(queue, 1, $0) }
     wgpuCommandBufferRelease(commandBuffer)
-    _ = wgpuDevicePoll(device, 0, nil)
+    _ = wgpuDevicePoll(device, 1, nil)
+    wgpuInstanceProcessEvents(instance)
 
-    guard let padded = mapBufferReadSync(device: device, buffer: buffer, offset: 0, size: bufferSize) else {
+    guard let padded = mapBufferReadSync(instance: instance, device: device, buffer: buffer, offset: 0, size: bufferSize) else {
         return nil
     }
 

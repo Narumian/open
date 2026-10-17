@@ -50,6 +50,7 @@ struct OpenVJRenderCLI {
         metalLayer.drawableSize = CGSize(width: CGFloat(width), height: CGFloat(height))
         metalLayer.frame = CGRect(x: 0, y: 0, width: CGFloat(width), height: CGFloat(height))
         metalLayer.isOpaque = true
+        metalLayer.framebufferOnly = false
 
         let layerPointer = Unmanaged.passUnretained(metalLayer).toOpaque()
         let attachment = VisualSurfaceAttachment(metalLayer: layerPointer)
@@ -84,7 +85,6 @@ struct OpenVJRenderCLI {
             fputs("[OpenVJRender] Frame readback failed.\n", stderr)
             exit(1)
         }
-
         do {
             try BGRA8PNG.write(bgra, width: Int(width), height: Int(height), to: outputURL)
         } catch {
