@@ -14,7 +14,7 @@ public enum ViewNode: Equatable, Sendable {
     /// Export sink group (`Output { … }`); children do not draw.
     case output([ViewNode])
     case video(fileURL: String)
-    /// Source picker leaf (draws from `SourceBrowserState` during walk).
+    /// Source picker leaf (draws from `SourceCatalogRegistry` during walk).
     case sourceBrowser
     /// Sequential stack (`Add`): first child full opacity, later layers ~55%.
     case group([ViewNode])

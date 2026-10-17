@@ -8,7 +8,8 @@ final class VisualView: NSView {
     private var timer: Timer?
     private var lastDrawableSize = CGSize.zero
     private let interAppController = InterAppTextureController()
-    private let sourceBrowserController = SourceBrowserController()
+    private let sourceCatalog = MacSourceCatalog()
+    private lazy var sourceBrowserController = SourceBrowserController(catalog: sourceCatalog)
 
     override func makeBackingLayer() -> CALayer { CAMetalLayer() }
 
@@ -59,6 +60,7 @@ final class VisualView: NSView {
         }
         self.renderer = renderer
         interAppController.bootstrapIfNeeded()
+        SourceCatalogRegistry.register(sourceCatalog)
         sourceBrowserController.install()
         if let wgpu = renderer as? WGPUVisualRenderer {
             if SourceBrowserSettings.requestedAtLaunch {

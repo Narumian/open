@@ -4,27 +4,37 @@ import Foundation
 ///
 /// During tree walk this leaf:
 /// 1. Requests the AppKit source browser panel (once per scene attachment).
-/// 2. Draws the current `SourceBrowserState.shared.selection` (local `Video` or inter-app subscribe).
+/// 2. Draws the current `SourceCatalogRegistry.selectionState.selection`.
 ///
 /// v0: no GPU draw when selection is `.none` (mixer sibling layers still render).
 public struct SourceBrowser: View {
     public typealias Body = Never
 
     public let mediaFolderURL: URL?
+    private let catalog: (any SourceCatalog)?
 
     public init() {
         mediaFolderURL = nil
+        catalog = nil
     }
 
     public init(mediaFolder: URL) {
         mediaFolderURL = mediaFolder
+        catalog = nil
     }
 
     public init(mediaFolderPath: String) {
         mediaFolderURL = URL(fileURLWithPath: mediaFolderPath)
+        catalog = nil
     }
 
     public init(mediaFolderURL: URL?) {
+        self.mediaFolderURL = mediaFolderURL
+        catalog = nil
+    }
+
+    public init(catalog: any SourceCatalog, mediaFolderURL: URL? = nil) {
+        self.catalog = catalog
         self.mediaFolderURL = mediaFolderURL
     }
 
@@ -33,17 +43,15 @@ public struct SourceBrowser: View {
     }
 
     public func renderLeaf(in context: inout ViewRenderContext) {
-        context.requestSourceBrowser(
-            SourceBrowserConfiguration(mediaFolderURL: mediaFolderURL)
-        )
-        switch SourceBrowserState.shared.selection {
-        case .none:
-            break
-        case .localVideo(let url):
-            context.drawVideo(fileURL: url)
-        case .interAppInput(let name):
-            context.drawInterAppTextureInput(serverName: name)
+        let activeCatalog = catalog ?? SourceCatalogRegistry.current
+        let selectionState = activeCatalog?.selectionState ?? SourceCatalogRegistry.selectionState
+        if let folder = mediaFolderURL {
+            selectionState.mediaFolderURL = folder
         }
+        context.requestSourceBrowser(
+            SourceBrowserConfiguration(mediaFolderURL: selectionState.mediaFolderURL ?? mediaFolderURL)
+        )
+        SourceRendering.draw(selection: selectionState.selection, in: &context)
     }
 }
 

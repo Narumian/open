@@ -5,17 +5,21 @@ import UniformTypeIdentifiers
 
 /// AppKit source picker for `SourceBrowser` scenes (local video folder + inter-app input discovery).
 final class SourceBrowserController: NSObject, NSWindowDelegate {
+    private let catalog: MacSourceCatalog
     private var panel: NSPanel?
     private var tableView: NSTableView?
     private var rows: [SourceBrowserRow] = []
     private var inputServersObserver: NSObjectProtocol?
-    private var configuredFolder: URL?
     private var didAutoPresent = false
+
+    init(catalog: MacSourceCatalog) {
+        self.catalog = catalog
+        super.init()
+    }
 
     private enum SourceBrowserRow: Equatable {
         case none
-        case localFile(URL, displayName: String)
-        case interAppServer(name: String, displayName: String)
+        case catalogEntry(SourceDescriptor)
         case manualInterAppInput(name: String)
     }
 
@@ -50,21 +54,14 @@ final class SourceBrowserController: NSObject, NSWindowDelegate {
 
     private func handlePresent(_ configuration: SourceBrowserConfiguration) {
         if let folder = configuration.mediaFolderURL {
-            configuredFolder = folder
-            SourceBrowserState.shared.mediaFolderURL = folder
-        } else if configuredFolder == nil {
-            configuredFolder = SourceBrowserState.shared.mediaFolderURL ?? Self.defaultMediaFolder()
-            SourceBrowserState.shared.mediaFolderURL = configuredFolder
+            catalog.mediaFolderURL = folder
+        } else if catalog.mediaFolderURL == nil {
+            catalog.mediaFolderURL = catalog.selectionState.mediaFolderURL ?? MacSourceCatalog.defaultMediaFolder()
         }
         if !didAutoPresent {
             didAutoPresent = true
             showPanel()
         }
-    }
-
-    private static func defaultMediaFolder() -> URL {
-        FileManager.default.urls(for: .moviesDirectory, in: .userDomainMask).first
-            ?? FileManager.default.homeDirectoryForCurrentUser
     }
 
     private func ensurePanel() {
@@ -142,10 +139,9 @@ final class SourceBrowserController: NSObject, NSWindowDelegate {
         panel.canChooseFiles = false
         panel.canChooseDirectories = true
         panel.allowsMultipleSelection = false
-        panel.directoryURL = configuredFolder
+        panel.directoryURL = catalog.mediaFolderURL
         guard panel.runModal() == .OK, let url = panel.url else { return }
-        configuredFolder = url
-        SourceBrowserState.shared.mediaFolderURL = url
+        catalog.mediaFolderURL = url
         reloadRows(keepingSelection: false)
     }
 
@@ -154,10 +150,12 @@ final class SourceBrowserController: NSObject, NSWindowDelegate {
         panel.canChooseFiles = true
         panel.canChooseDirectories = false
         panel.allowsMultipleSelection = false
-        panel.directoryURL = configuredFolder
+        panel.directoryURL = catalog.mediaFolderURL
         panel.allowedContentTypes = [.movie, .mpeg4Movie, .quickTimeMovie, .video]
         guard panel.runModal() == .OK, let url = panel.url else { return }
-        SourceBrowserState.shared.selection = .localVideo(url)
+        catalog.selectionState.selection = .source(
+            SourceDescriptor(displayName: url.lastPathComponent, kind: .localFile(url))
+        )
         reloadRows(keepingSelection: true)
     }
 
@@ -173,49 +171,43 @@ final class SourceBrowserController: NSObject, NSWindowDelegate {
         guard alert.runModal() == .alertFirstButtonReturn else { return }
         let name = field.stringValue.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !name.isEmpty else { return }
-        SourceBrowserState.shared.selection = .interAppInput(name: name)
+        catalog.selectionState.selection = .source(
+            SourceDescriptor(displayName: name, kind: .interAppInput(serverName: name))
+        )
         reloadRows(keepingSelection: true)
     }
 
     private func reloadRows(keepingSelection: Bool) {
+        catalog.refresh()
         var next: [SourceBrowserRow] = [.none]
-        if let folder = configuredFolder ?? SourceBrowserState.shared.mediaFolderURL {
-            let urls = (try? FileManager.default.contentsOfDirectory(
-                at: folder,
-                includingPropertiesForKeys: [.isRegularFileKey],
-                options: [.skipsHiddenFiles]
-            )) ?? []
-            let videos = urls.filter { Self.isVideoFile($0) }.sorted { $0.lastPathComponent < $1.lastPathComponent }
-            for url in videos {
-                next.append(.localFile(url, displayName: url.lastPathComponent))
-            }
+        for entry in catalog.sources {
+            next.append(.catalogEntry(entry.descriptor))
         }
-
-        for entry in InterAppTextureRegistry.Input.availableServers() {
-            next.append(.interAppServer(name: entry.serverName, displayName: entry.displayName))
+        if case .source(let descriptor) = catalog.selectionState.selection,
+           case .interAppInput(let name) = descriptor.kind,
+           !catalog.sources.contains(where: { $0.id == descriptor.id })
+        {
+            next.append(.manualInterAppInput(name: name))
         }
 
         rows = next
         tableView?.reloadData()
 
         if !keepingSelection {
-            SourceBrowserState.shared.selection = .none
+            catalog.selectionState.selection = .none
         }
-    }
-
-    private static func isVideoFile(_ url: URL) -> Bool {
-        let ext = url.pathExtension.lowercased()
-        return ["mov", "mp4", "m4v", "mkv", "avi", "webm"].contains(ext)
     }
 
     private func applySelection(for row: SourceBrowserRow) {
         switch row {
         case .none:
-            SourceBrowserState.shared.selection = .none
-        case .localFile(let url, _):
-            SourceBrowserState.shared.selection = .localVideo(url)
-        case .interAppServer(let name, _), .manualInterAppInput(let name):
-            SourceBrowserState.shared.selection = .interAppInput(name: name)
+            catalog.selectionState.selection = .none
+        case .catalogEntry(let descriptor):
+            catalog.selectionState.selection = .source(descriptor)
+        case .manualInterAppInput(let name):
+            catalog.selectionState.selection = .source(
+                SourceDescriptor(displayName: name, kind: .interAppInput(serverName: name))
+            )
         }
     }
 }
@@ -254,10 +246,15 @@ extension SourceBrowserController: NSTableViewDataSource, NSTableViewDelegate {
         switch row {
         case .none:
             return "— None (generative only) —"
-        case .localFile(_, let displayName):
-            return "📁 \(displayName)"
-        case .interAppServer(_, let displayName):
-            return "◎ Inter-app: \(displayName)"
+        case .catalogEntry(let descriptor):
+            switch descriptor.kind {
+            case .localFile:
+                return "📁 \(descriptor.displayName)"
+            case .interAppInput:
+                return "◎ Inter-app: \(descriptor.displayName)"
+            case .url, .captureDevice:
+                return descriptor.displayName
+            }
         case .manualInterAppInput(let name):
             return "◎ Inter-app (manual): \(name)"
         }

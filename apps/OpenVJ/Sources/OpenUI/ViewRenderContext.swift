@@ -145,15 +145,9 @@ public struct ViewRenderContext {
                 drawVideo(fileURL: url)
             }
         case .sourceBrowser:
-            requestSourceBrowser(SourceBrowserConfiguration(mediaFolderURL: SourceBrowserState.shared.mediaFolderURL))
-            switch SourceBrowserState.shared.selection {
-            case .none:
-                break
-            case .localVideo(let url):
-                drawVideo(fileURL: url)
-            case .interAppInput(let name):
-                drawInterAppTextureInput(serverName: name)
-            }
+            let selectionState = SourceCatalogRegistry.selectionState
+            requestSourceBrowser(SourceBrowserConfiguration(mediaFolderURL: selectionState.mediaFolderURL))
+            SourceRendering.draw(selection: selectionState.selection, in: &self)
         case .group(let children):
             for child in children {
                 render(node: child)
