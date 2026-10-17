@@ -1,0 +1,36 @@
+name: OpenVJ
+options:
+  bundleIdPrefix: com.narumian.open
+  deploymentTarget:
+    macOS: "13.0"
+  createIntermediateGroups: true
+settings:
+  base:
+    SWIFT_VERSION: "5.9"
+    MACOSX_DEPLOYMENT_TARGET: "13.0"
+targets:
+  OpenVJ:
+    type: framework
+    platform: macOS
+    sources:
+      - path: Sources/OpenVJ
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.narumian.open.openvj
+        GENERATE_INFOPLIST_FILE: YES
+        DEFINES_MODULE: YES
+  OpenVJApp:
+    type: application
+    platform: macOS
+    sources:
+      - path: Sources/OpenVJApp
+    dependencies:
+      - target: OpenVJ
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.narumian.open.openvjapp
+        GENERATE_INFOPLIST_FILE: YES
+        INFOPLIST_KEY_LSApplicationCategoryType: public.app-category.entertainment
+        INFOPLIST_KEY_NSHumanReadableCopyright: ""
+    scheme:
+      testTargets: []
