@@ -86,6 +86,9 @@ public final class WGPUVisualRenderer: VisualRenderer {
         self.bindGroup = bindGroup
         self.pipeline = pipeline
         videoRenderState = WGPUVideoRenderState(device: device, queue: queue)
+        if let videoRenderState {
+            playbackHost.attach(videoRenderState: videoRenderState)
+        }
         interAppInputState = WGPUInterAppTextureInputState(device: device, queue: queue)
         interAppPublisher?.attach(device: device, queue: queue)
     }
@@ -316,10 +319,14 @@ public final class WGPUVisualRenderer: VisualRenderer {
                 wgpuRenderPassEncoderSetBindGroup(pass, 0, drawBindGroup, 0, nil)
                 wgpuRenderPassEncoderDraw(pass, 3, 1, 0, 0)
             }
+            videoRenderState?.setRenderPass(pass)
             var visualContext = ViewRenderContext(
                 frameTime: elapsed,
                 resolveClipDuration: { [playbackHost] url in
                     playbackHost.clipDurationSeconds(for: url)
+                },
+                makeVideoPlayer: { [playbackHost] url in
+                    playbackHost.makeVideoPlayer(for: url)
                 },
                 drawShaderLegacy: {
                     writeUniforms(time: elapsed, waveMode: 0, layerAlpha: 1)

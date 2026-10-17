@@ -13,7 +13,8 @@ final class WGPUVideoRenderState {
     private let uniformBuffer: WGPUBuffer
     private let sampler: WGPUSampler
 
-    private var sources: [String: VideoFrameSource] = [:]
+    private var players: [String: AVVideoPlayer] = [:]
+    private var currentPass: WGPURenderPassEncoder?
     private var textures: [String: WGPUTexture] = [:]
     private var textureWidths: [String: UInt32] = [:]
     private var textureHeights: [String: UInt32] = [:]
@@ -45,10 +46,28 @@ final class WGPUVideoRenderState {
         wgpuBufferRelease(uniformBuffer)
     }
 
-    func draw(fileURL: URL, layerAlpha: Float, pass: WGPURenderPassEncoder) {
+    func setRenderPass(_ pass: WGPURenderPassEncoder) {
+        currentPass = pass
+    }
+
+    func player(for fileURL: URL) -> AVVideoPlayer? {
         let key = fileURL.absoluteString
-        guard let source = source(for: fileURL, key: key) else { return }
-        guard let pixelBuffer = source.copyCurrentPixelBuffer() else { return }
+        if let existing = players[key] { return existing }
+        guard let created = AVVideoPlayer(fileURL: fileURL, renderState: self) else { return nil }
+        players[key] = created
+        return created
+    }
+
+    func draw(fileURL: URL, layerAlpha: Float, pass: WGPURenderPassEncoder) {
+        setRenderPass(pass)
+        guard let player = player(for: fileURL) else { return }
+        drawCurrentFrame(player: player, layerAlpha: layerAlpha)
+    }
+
+    func drawCurrentFrame(player: AVVideoPlayer, layerAlpha: Float) {
+        guard let pass = currentPass else { return }
+        let key = player.fileURL.absoluteString
+        guard let pixelBuffer = player.copyCurrentPixelBuffer() else { return }
         guard let texture = upload(pixelBuffer: pixelBuffer, key: key) else { return }
         guard let textureView = wgpuTextureCreateView(texture, nil) else { return }
         defer { wgpuTextureViewRelease(textureView) }
@@ -60,13 +79,6 @@ final class WGPUVideoRenderState {
         wgpuRenderPassEncoderSetPipeline(pass, pipeline)
         wgpuRenderPassEncoderSetBindGroup(pass, 0, bindGroup, 0, nil)
         wgpuRenderPassEncoderDraw(pass, 3, 1, 0, 0)
-    }
-
-    private func source(for fileURL: URL, key: String) -> VideoFrameSource? {
-        if let existing = sources[key] { return existing }
-        guard let created = VideoFrameSource(fileURL: fileURL) else { return nil }
-        sources[key] = created
-        return created
     }
 
     private func upload(pixelBuffer: CVPixelBuffer, key: String) -> WGPUTexture? {

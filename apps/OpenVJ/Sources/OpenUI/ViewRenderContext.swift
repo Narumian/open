@@ -25,6 +25,8 @@ public struct ViewRenderContext {
     public var sourcePlayback: SourcePlaybackContext
 
     private let resolveClipDuration: (URL) -> Float?
+    private let makeVideoPlayer: ((URL) -> VideoPlayer?)?
+    private var videoPlayerCache: [URL: VideoPlayer]
     private var blendLayerIndex: Int
     private var equalWeightMixLayerCount: Int?
     private var savedEqualWeightMixLayerCount: Int?
@@ -42,6 +44,7 @@ public struct ViewRenderContext {
         frameTime: Float,
         sourcePlayback: SourcePlaybackContext = SourcePlaybackContext(),
         resolveClipDuration: @escaping (URL) -> Float? = { _ in nil },
+        makeVideoPlayer: ((URL) -> VideoPlayer?)? = nil,
         drawShaderLegacy: @escaping () -> Void,
         drawWaveBody: @escaping (WaveMode, Float, Float) -> Void,
         drawVideo: @escaping (URL, Float) -> Void,
@@ -54,6 +57,8 @@ public struct ViewRenderContext {
         self.frameTime = frameTime
         self.sourcePlayback = sourcePlayback
         self.resolveClipDuration = resolveClipDuration
+        self.makeVideoPlayer = makeVideoPlayer
+        videoPlayerCache = [:]
         blendLayerIndex = 0
         equalWeightMixLayerCount = nil
         self.drawShaderLegacy = drawShaderLegacy
@@ -128,9 +133,27 @@ public struct ViewRenderContext {
         drawWaveBodyImpl(mode, resolvedTime, nextBlendLayerAlpha())
     }
 
-    /// Local video file leaf draw (`Video`).
-    public mutating func drawVideo(fileURL: URL) {
-        drawVideoImpl(fileURL, nextBlendLayerAlpha())
+    /// Local video file leaf draw (`Video`, `LoopPlayer`, active sequence clip).
+    public mutating func drawVideo(fileURL: URL, loops: Bool = true) {
+        let layerAlpha = nextBlendLayerAlpha()
+        if let makeVideoPlayer, let player = cachedVideoPlayer(for: fileURL, make: makeVideoPlayer) {
+            player.loops = loops
+            player.drawCurrentFrame(layerAlpha: layerAlpha)
+            return
+        }
+        drawVideoImpl(fileURL, layerAlpha)
+    }
+
+    private mutating func cachedVideoPlayer(
+        for fileURL: URL,
+        make: (URL) -> VideoPlayer?
+    ) -> VideoPlayer? {
+        if let existing = videoPlayerCache[fileURL] {
+            return existing
+        }
+        guard let player = make(fileURL) else { return nil }
+        videoPlayerCache[fileURL] = player
+        return player
     }
 
     /// Host adapter hook: clip length in seconds (nil → OpenUI placeholder duration).

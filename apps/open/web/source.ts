@@ -55,6 +55,22 @@ export type SourcePlaybackContext = {
 
 export const DEFAULT_CLIP_DURATION_SEC = 10;
 
+/**
+ * Mirrors OpenUI `VideoPlayer` (host implements decode + `drawCurrentFrame`).
+ * Separate from `PlaybackHost` duration probes / `makeVideoPlayer` injection on the render context.
+ */
+export type VideoPlayer = {
+  fileURL: string;
+  loops: boolean;
+  isPlaying: boolean;
+  currentTimeSeconds: number;
+  durationSeconds?: number;
+  play(): void;
+  pause(): void;
+  seek(toSeconds: number): void;
+  drawCurrentFrame(layerAlpha: number): void;
+};
+
 export function tickSequenceTransport(
   state: SequenceTransportState,
   deltaSec: number,

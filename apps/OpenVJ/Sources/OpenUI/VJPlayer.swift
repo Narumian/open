@@ -61,7 +61,7 @@ public struct LoopPlayer: View {
     public func renderLeaf(in context: inout ViewRenderContext) {
         let url = fileURL ?? context.sourcePlayback.selectedLocalFileURL
         guard let url else { return }
-        context.drawVideo(fileURL: url)
+        context.drawVideo(fileURL: url, loops: loops)
     }
 }
 
@@ -120,7 +120,7 @@ public struct SequencePlayer: View {
     public func renderLeaf(in context: inout ViewRenderContext) {
         context.sourcePlayback.bindSequence(clips: clips, loops: loops)
         guard let url = context.sourcePlayback.activeSequenceClipURL() else { return }
-        context.drawVideo(fileURL: url)
+        context.drawVideo(fileURL: url, loops: false)
     }
 }
 

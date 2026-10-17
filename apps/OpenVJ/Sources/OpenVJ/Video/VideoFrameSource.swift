@@ -10,6 +10,7 @@ final class VideoFrameSource {
     private let playerItem: AVPlayerItem
     private let videoOutput: AVPlayerItemVideoOutput
     private var didLogNonFileURL = false
+    var loops = true
 
     init?(fileURL: URL) {
         guard fileURL.isFileURL else { return nil }
@@ -44,7 +45,30 @@ final class VideoFrameSource {
         player.pause()
     }
 
+    var isPlaying: Bool { player.rate > 0 }
+
+    var currentTimeSeconds: Float {
+        Float(CMTimeGetSeconds(player.currentTime()))
+    }
+
+    func play() {
+        player.play()
+    }
+
+    func pause() {
+        player.pause()
+    }
+
+    func seek(toSeconds: Float) {
+        let time = CMTime(seconds: Double(toSeconds), preferredTimescale: 600)
+        player.seek(to: time)
+    }
+
     @objc private func loopToStart() {
+        guard loops else {
+            player.pause()
+            return
+        }
         player.seek(to: .zero)
         player.play()
     }
