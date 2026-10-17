@@ -1,5 +1,7 @@
 # OpenVJ
 
+**v0.1.0** — first OpenUI / OpenVJ milestone (see [CHANGELOG.md](CHANGELOG.md)).
+
 Standalone macOS generative visuals via **WebGPU** ([wgpu-native](https://github.com/gfx-rs/wgpu-native) + Swift). ~60fps in a resizable window or fullscreen.
 
 Rendering uses a `CAMetalLayer` surface with wgpu’s Metal backend — not a direct `MTKView` Metal renderer.
