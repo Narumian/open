@@ -222,7 +222,7 @@ Scene selection (`OPEN_VJ_SCENE` or `--scene`):
 | Value | Root scene |
 |-------|------------|
 | `default` (default) | `OpenVJDefaultScene` |
-| `source-browser-mixer` | `OpenVJSourceBrowserMixerScene` (GPU mix only; UI not shown) |
+| `source-browser-mixer` | `OpenVJSourceBrowserMixerScene` + CPU Sources chrome (header bar, folder glyphs, row stripes) beside the GPU mix |
 | `live` | `OpenVJLiveScene` |
 | `timed-demo` | `OpenVJTimedDemoScene` |
 
@@ -231,6 +231,8 @@ OPEN_VJ_SCENE=source-browser-mixer swift run OpenVJRender --output /tmp/frame.pn
 ```
 
 The tool prints the output path on success. Prefer this over `OPEN_VJ_SOURCE_BROWSER=1` for automated screenshots.
+
+Exported PNGs use a **top-left origin** (row 0 = top). `readBGRA8Texture` vertically flips the wgpu→buffer copy so Metal’s bottom-up readback matches CPU chrome and `BGRA8PNG`.
 
 ## Build & run
 
