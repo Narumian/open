@@ -14,7 +14,11 @@ var targets: [Target] = [
     ),
     .target(
         name: "OpenUI",
-        path: "Sources/OpenUI"
+        path: "Sources/OpenUI",
+        exclude: [
+            "Deferred/README.md",
+            "Deferred/VJPlaybackDSL.swift",
+        ]
     ),
     .target(
         name: "OpenVJApple",

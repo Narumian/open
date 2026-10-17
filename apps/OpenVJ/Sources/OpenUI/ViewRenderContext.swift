@@ -133,7 +133,7 @@ public struct ViewRenderContext {
         drawWaveBodyImpl(mode, resolvedTime, nextBlendLayerAlpha())
     }
 
-    /// Local video file leaf draw (`Video`, `LoopPlayer`, active sequence clip).
+    /// Local video file leaf draw (`Video`, `LoopPlayer`).
     public mutating func drawVideo(fileURL: URL, loops: Bool = true) {
         let layerAlpha = nextBlendLayerAlpha()
         if let makeVideoPlayer, let player = cachedVideoPlayer(for: fileURL, make: makeVideoPlayer) {
@@ -161,14 +161,8 @@ public struct ViewRenderContext {
         resolveClipDuration(fileURL)
     }
 
-    /// Advances any bound `SequencePlayer` transport before or after the tree walk.
-    public mutating func tickPlaybackTransport() {
-        sourcePlayback.tickSequence(frameTime: frameTime, resolveDuration: resolveClipDuration)
-    }
-
     /// Renders a flattened node tree using the same draw hooks as the declarative API.
     public mutating func render(node: ViewNode) {
-        tickPlaybackTransport()
         switch node {
         case .empty:
             break

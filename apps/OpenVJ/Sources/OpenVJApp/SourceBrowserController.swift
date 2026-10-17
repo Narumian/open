@@ -192,10 +192,33 @@ final class SourceBrowserController: NSObject, NSWindowDelegate {
 
         rows = next
         tableView?.reloadData()
+        syncTableSelectionToCatalog()
 
         if !keepingSelection {
             catalog.selectionState.selection = .none
+            syncTableSelectionToCatalog()
         }
+    }
+
+    private func syncTableSelectionToCatalog() {
+        guard let tableView else { return }
+        let selection = catalog.selectionState.selection
+        let index = rows.firstIndex { row in
+            switch (row, selection) {
+            case (.none, .none):
+                return true
+            case (.catalogEntry(let descriptor), .source(let selected)):
+                return descriptor.id == selected.id
+            case (.manualInterAppInput(let name), .source(let selected)):
+                if case .interAppInput(let serverName) = selected.kind {
+                    return serverName == name
+                }
+                return false
+            default:
+                return false
+            }
+        } ?? 0
+        tableView.selectRowIndexes(IndexSet(integer: index), byExtendingSelection: false)
     }
 
     private func applySelection(for row: SourceBrowserRow) {

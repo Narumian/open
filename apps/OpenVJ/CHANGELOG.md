@@ -2,6 +2,13 @@
 
 All notable changes to OpenVJ and the **OpenUI** scene DSL are documented here.
 
+## Unreleased
+
+### macOS app
+
+- **`OpenVJApp`** defaults to `OpenVJSourceBrowserMixerScene` so the main window mixes catalog-selected video with the generative layer; **View → Source Browser…** (⇧⌘B) lists Movies-folder media via `MacSourceCatalog`.
+- Deferred **`VJPlayer` / `Sequence` / `SequencePlayer`** from the `OpenUI` build (sources kept under `Sources/OpenUI/Deferred/`).
+
 ## 0.1.0 — 2026-10-17
 
 First tagged milestone: declarative scene graph, WGPU renderer, macOS app shell, and headless PNG export.

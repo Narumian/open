@@ -365,7 +365,6 @@ public final class WGPUVisualRenderer: VisualRenderer {
                     Self.logStreamOutputStubOnce(kind)
                 }
             )
-            visualContext.tickPlaybackTransport()
             rootView.render(in: &visualContext)
             wgpuRenderPassEncoderEnd(pass)
             wgpuRenderPassEncoderRelease(pass)

@@ -63,11 +63,11 @@ final class VisualView: NSView {
         SourceCatalogRegistry.register(sourceCatalog)
         sourceBrowserController.install()
         if let wgpu = renderer as? WGPUVisualRenderer {
-            if SourceBrowserSettings.requestedAtLaunch {
-                wgpu.rootView = AnyView(OpenVJSourceBrowserMixerScene())
-            } else if InterAppTextureSettings.interAppPublishRequestedAtLaunch {
+            if InterAppTextureSettings.interAppPublishRequestedAtLaunch {
                 wgpu.rootView = AnyView(OpenVJLiveScene())
                 wgpu.sceneInterAppPublishSuppressed = false
+            } else {
+                wgpu.rootView = AnyView(OpenVJSourceBrowserMixerScene())
             }
         }
         updateDrawableSize()
