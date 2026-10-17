@@ -40,11 +40,30 @@ private enum _VisualRenderWalker {
     }
 }
 
-/// Default generative scene shipped with OpenVJ (single shader leaf).
+/// Default generative scene shipped with OpenVJ.
 public struct OpenVJDefaultScene: Visual {
     public init() {}
 
-    public var body: ShaderVisual {
-        ShaderVisual()
+    public var body: Add<TupleVisual2<SinBody, TanBody>> {
+        Add {
+            SinBody()
+            TanBody().time(OpenVJSceneTime.current)
+        }
+    }
+}
+
+/// Example scene with an explicit time parameter (e.g. from your own clock).
+public struct OpenVJTimedDemoScene: Visual {
+    public let t: Float
+
+    public init(time t: Float) {
+        self.t = t
+    }
+
+    public var body: Add<TupleVisual2<SinBody, TanBody>> {
+        Add {
+            SinBody()
+            TanBody().time(t)
+        }
     }
 }

@@ -4,6 +4,7 @@ import Foundation
 public enum VisualNode: Equatable, Sendable {
     case empty
     case generativeShader
+    case waveBody(WaveMode, explicitTime: Float?)
     case group([VisualNode])
 }
 

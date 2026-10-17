@@ -4,7 +4,7 @@ import OpenVJApple
 
 public final class WGPUVisualRenderer: VisualRenderer {
     private static let surfaceFormat = WGPUTextureFormat_BGRA8Unorm
-    private static let uniformStride = 16
+    private static let uniformStride = 32
 
     private let instance: WGPUInstance
     private let surface: WGPUSurface
@@ -133,15 +133,7 @@ public final class WGPUVisualRenderer: VisualRenderer {
 
         let time = frameTime ?? (CFAbsoluteTimeGetCurrent() - startTime)
         let elapsed = Float(time)
-        let uniforms: (Float, Float, Float, Float) = (
-            elapsed,
-            Float(configuredWidth),
-            Float(configuredHeight),
-            0
-        )
-        withUnsafeBytes(of: uniforms) { bytes in
-            wgpuQueueWriteBuffer(queue, uniformBuffer, 0, bytes.baseAddress, Self.uniformStride)
-        }
+        OpenVJSceneTime.current = elapsed
 
         var surfaceTexture = WGPUSurfaceTexture()
         wgpuSurfaceGetCurrentTexture(surface, &surfaceTexture)
@@ -190,11 +182,40 @@ public final class WGPUVisualRenderer: VisualRenderer {
             guard let pass = wgpuCommandEncoderBeginRenderPass(encoder, &descriptor) else { return false }
             let drawPipeline = pipeline
             let drawBindGroup = bindGroup
-            var visualContext = VisualRenderContext {
-                wgpuRenderPassEncoderSetPipeline(pass, drawPipeline)
-                wgpuRenderPassEncoderSetBindGroup(pass, 0, drawBindGroup, 0, nil)
-                wgpuRenderPassEncoderDraw(pass, 3, 1, 0, 0)
+            let resolution = (
+                Float(configuredWidth),
+                Float(configuredHeight)
+            )
+            func writeUniforms(time: Float, waveMode: Float, layerAlpha: Float) {
+                let uniforms: (Float, Float, Float, Float, Float, Float, Float, Float) = (
+                    time,
+                    resolution.0,
+                    resolution.1,
+                    waveMode,
+                    layerAlpha,
+                    0,
+                    0,
+                    0
+                )
+                withUnsafeBytes(of: uniforms) { bytes in
+                    wgpuQueueWriteBuffer(queue, uniformBuffer, 0, bytes.baseAddress, Self.uniformStride)
+                }
             }
+            var visualContext = VisualRenderContext(
+                frameTime: elapsed,
+                drawShaderLegacy: {
+                    writeUniforms(time: elapsed, waveMode: 0, layerAlpha: 1)
+                    wgpuRenderPassEncoderSetPipeline(pass, drawPipeline)
+                    wgpuRenderPassEncoderSetBindGroup(pass, 0, drawBindGroup, 0, nil)
+                    wgpuRenderPassEncoderDraw(pass, 3, 1, 0, 0)
+                },
+                drawWaveBody: { mode, time, layerAlpha in
+                    writeUniforms(time: time, waveMode: mode.rawValue, layerAlpha: layerAlpha)
+                    wgpuRenderPassEncoderSetPipeline(pass, drawPipeline)
+                    wgpuRenderPassEncoderSetBindGroup(pass, 0, drawBindGroup, 0, nil)
+                    wgpuRenderPassEncoderDraw(pass, 3, 1, 0, 0)
+                }
+            )
             rootVisual.render(in: &visualContext)
             wgpuRenderPassEncoderEnd(pass)
             wgpuRenderPassEncoderRelease(pass)
@@ -263,7 +284,8 @@ public final class WGPUVisualRenderer: VisualRenderer {
     struct VisualUniforms {
         time: f32,
         resolution: vec2<f32>,
-        _pad: f32,
+        waveMode: f32,
+        layerAlpha: f32,
     };
 
     @group(0) @binding(0) var<uniform> u: VisualUniforms;
@@ -302,6 +324,10 @@ public final class WGPUVisualRenderer: VisualRenderer {
         return mix(mix(a, b, u.x), mix(c, d, u.x), u.y);
     }
 
+    fn tanh01(x: f32) -> f32 {
+        return tanh(x) * 0.85;
+    }
+
     @fragment
     fn fs(in: VertexOut) -> @location(0) vec4<f32> {
         let uv = in.uv;
@@ -309,10 +335,16 @@ public final class WGPUVisualRenderer: VisualRenderer {
         var p = (uv - 0.5) * vec2(aspect, 1.0);
 
         let t = u.time * 0.35;
-        let warp = vec2(
+        let sinWarp = vec2(
             sin(p.y * 3.0 + t) * 0.15,
             cos(p.x * 2.5 - t * 1.1) * 0.15
         );
+        let tanWarp = vec2(
+            tanh01(p.y * 2.2 + t * 1.2) * 0.22,
+            tanh01(p.x * 1.9 - t * 0.9) * 0.22
+        );
+        let useTan = u.waveMode > 0.5;
+        let warp = select(sinWarp, tanWarp, useTan);
         let q = p + warp;
         let n = noise(q * 4.0 + t);
         let bands = sin((length(q) - t * 0.4) * 12.0 + n * 6.0);
@@ -322,8 +354,15 @@ public final class WGPUVisualRenderer: VisualRenderer {
             0.25 + 0.45 * cos(t * 0.7 + bands),
             0.55 + 0.35 * sin(t * 1.3 - n * 3.0)
         );
+        if (useTan) {
+            col = vec3(
+                0.35 + 0.45 * cos(t * 0.8 + bands * 1.5),
+                0.40 + 0.40 * sin(t * 1.1 - n * 4.0),
+                0.50 + 0.35 * cos(t * 0.6 + bands)
+            );
+        }
         col *= 0.65 + 0.35 * bands;
-        return vec4(col, 1.0);
+        return vec4(col, u.layerAlpha);
     }
     """
 
@@ -395,26 +434,36 @@ public final class WGPUVisualRenderer: VisualRenderer {
 
         return withWGPUString("vs") { vertexEntry in
             withWGPUString("fs") { fragmentEntry in
-                var target = WGPUColorTargetState()
-                target.format = surfaceFormat
-                target.writeMask = WGPUColorWriteMask_All
-                return withUnsafePointer(to: &target) { targetPointer in
-                    var fragment = WGPUFragmentState()
-                    fragment.module = shader
-                    fragment.entryPoint = fragmentEntry
-                    fragment.targetCount = 1
-                    fragment.targets = targetPointer
-                    return withUnsafePointer(to: &fragment) { fragmentPointer in
-                        var descriptor = WGPURenderPipelineDescriptor()
-                        descriptor.layout = pipelineLayout
-                        descriptor.vertex.module = shader
-                        descriptor.vertex.entryPoint = vertexEntry
-                        descriptor.vertex.bufferCount = 0
-                        descriptor.fragment = fragmentPointer
-                        descriptor.primitive.topology = WGPUPrimitiveTopology_TriangleList
-                        descriptor.primitive.cullMode = WGPUCullMode_None
-                        descriptor.multisample.count = 1
-                        return wgpuDeviceCreateRenderPipeline(device, &descriptor)
+                var blend = WGPUBlendState()
+                blend.color.operation = WGPUBlendOperation_Add
+                blend.color.srcFactor = WGPUBlendFactor_SrcAlpha
+                blend.color.dstFactor = WGPUBlendFactor_OneMinusSrcAlpha
+                blend.alpha.operation = WGPUBlendOperation_Add
+                blend.alpha.srcFactor = WGPUBlendFactor_One
+                blend.alpha.dstFactor = WGPUBlendFactor_OneMinusSrcAlpha
+                return withUnsafePointer(to: &blend) { blendPointer in
+                    var target = WGPUColorTargetState()
+                    target.format = surfaceFormat
+                    target.writeMask = WGPUColorWriteMask_All
+                    target.blend = blendPointer
+                    return withUnsafePointer(to: &target) { targetPointer in
+                        var fragment = WGPUFragmentState()
+                        fragment.module = shader
+                        fragment.entryPoint = fragmentEntry
+                        fragment.targetCount = 1
+                        fragment.targets = targetPointer
+                        return withUnsafePointer(to: &fragment) { fragmentPointer in
+                            var descriptor = WGPURenderPipelineDescriptor()
+                            descriptor.layout = pipelineLayout
+                            descriptor.vertex.module = shader
+                            descriptor.vertex.entryPoint = vertexEntry
+                            descriptor.vertex.bufferCount = 0
+                            descriptor.fragment = fragmentPointer
+                            descriptor.primitive.topology = WGPUPrimitiveTopology_TriangleList
+                            descriptor.primitive.cullMode = WGPUCullMode_None
+                            descriptor.multisample.count = 1
+                            return wgpuDeviceCreateRenderPipeline(device, &descriptor)
+                        }
                     }
                 }
             }

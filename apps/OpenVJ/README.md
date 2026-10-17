@@ -26,12 +26,30 @@ Generative content is described with a SwiftUI-like **`Visual`** protocol: recur
 |------|------|
 | `Visual` | Scene graph protocol |
 | `VisualBuilder` | `@resultBuilder` for tuples, optionals, `if`/`else` |
-| `ShaderVisual` | Full-screen generative WGSL (default WGPU path) |
+| `Add` | Compose multiple leaves in tree order (layered full-screen draws) |
+| `SinBody` / `TanBody` | Wave-domain generative leaves (`waveMode` WGSL uniform) |
+| `TanBody.time(_:)` | Pin tan warp time (`Float` or `CFTimeInterval`) |
+| `OpenVJSceneTime.current` | Frame time written by the renderer (for `.time(...)` at call site) |
+| `ShaderVisual` | Legacy full-screen generative WGSL leaf |
 | `GroupVisual` | Transparent container for builder content |
 | `EmptyVisual` | No-op leaf |
 | `AnyVisual` | Type erasure for renderer storage |
-| `OpenVJDefaultScene` | Built-in root scene (`ShaderVisual`) |
+| `OpenVJDefaultScene` | Built-in root scene (`Add { SinBody(); TanBody().time(...) }`) |
+| `OpenVJTimedDemoScene` | Same stack with an explicit `time` parameter |
 | `VisualSceneHosting` | `VisualRenderer` + `rootVisual` (`WGPUVisualRenderer`) |
+
+**`Add` v0:** one shared render pass; each child draws a full-screen triangle in tree order. Later draws use src-alpha blending (~55% opacity) so stacked bodies stay visible. Not GPU additive blend yet.
+
+Example (matches the default scene shape):
+
+```swift
+Add {
+    SinBody()
+    TanBody().time(t)
+}
+```
+
+Use `OpenVJSceneTime.current` for `t` when you want the renderer’s frame clock, or pass your own `Float` (see `OpenVJTimedDemoScene`).
 
 `WGPUVisualRenderer.rootVisual` is traversed each frame; assign `AnyVisual(yourScene)` on a `VisualSceneHosting` renderer to swap scenes without touching the AppKit shell.
 
@@ -112,7 +130,7 @@ xcodebuild -scheme OpenVJApp -destination 'platform=macOS' build
 
 | Target | Role |
 |--------|------|
-| `OpenVJ` | `VisualRenderer` + `WGPUVisualRenderer` + `InterAppTexture` protocols |
+| `OpenVJ` | `Visual` scene graph + `VisualRenderer` + `WGPUVisualRenderer` + `InterAppTexture` |
 | `OpenVJApple` | Metal-layer → wgpu surface bridge |
 | `OpenVJSyphon` | Syphon publisher backend (when `Vendor/Syphon.xcframework` exists) |
 | `OpenVJApp` | AppKit shell (`VisualView`, 60Hz timer, optional Syphon menu) |
