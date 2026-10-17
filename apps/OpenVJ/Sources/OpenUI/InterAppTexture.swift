@@ -1,9 +1,5 @@
 import Foundation
 
-/// Renamed to `InterAppTextureOutput`; use `InterAppTextureOutput("name")` inside `Output { }`.
-@available(*, deprecated, renamed: "InterAppTextureOutput")
-public typealias InterAppTexture = InterAppTextureOutput
-
 /// Short name for mixer / source-browser examples (`Some()` in scene DSL).
 public typealias Some = SomeVisual
 
