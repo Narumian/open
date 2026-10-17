@@ -6,6 +6,7 @@ public enum ViewNode: Equatable, Sendable {
     case generativeShader
     case waveBody(WaveMode, explicitTime: Float?)
     case interAppPublish(serverName: String)
+    case interAppSubscribe(serverName: String)
     case video(fileURL: String)
     /// Sequential stack (`Add`): first child full opacity, later layers ~55%.
     case group([ViewNode])

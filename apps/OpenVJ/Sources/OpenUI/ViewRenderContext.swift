@@ -22,14 +22,18 @@ public struct ViewRenderContext {
     private let drawShaderLegacy: () -> Void
     private let drawWaveBodyImpl: (WaveMode, Float, Float) -> Void
     private let drawVideoImpl: (URL, Float) -> Void
+    private let drawInterAppTextureInputImpl: (String, Float) -> Void
     private let applyInterAppPublish: (InterAppPublishConfiguration) -> Void
+    private let applyInterAppSubscribe: (InterAppSubscribeConfiguration) -> Void
 
     public init(
         frameTime: Float,
         drawShaderLegacy: @escaping () -> Void,
         drawWaveBody: @escaping (WaveMode, Float, Float) -> Void,
         drawVideo: @escaping (URL, Float) -> Void,
-        applyInterAppPublish: @escaping (InterAppPublishConfiguration) -> Void
+        drawInterAppTextureInput: @escaping (String, Float) -> Void = { _, _ in },
+        applyInterAppPublish: @escaping (InterAppPublishConfiguration) -> Void,
+        applyInterAppSubscribe: @escaping (InterAppSubscribeConfiguration) -> Void = { _ in }
     ) {
         self.frameTime = frameTime
         blendLayerIndex = 0
@@ -37,7 +41,9 @@ public struct ViewRenderContext {
         self.drawShaderLegacy = drawShaderLegacy
         drawWaveBodyImpl = drawWaveBody
         drawVideoImpl = drawVideo
+        drawInterAppTextureInputImpl = drawInterAppTextureInput
         self.applyInterAppPublish = applyInterAppPublish
+        self.applyInterAppSubscribe = applyInterAppSubscribe
     }
 
     private mutating func nextBlendLayerAlpha() -> Float {
@@ -69,6 +75,17 @@ public struct ViewRenderContext {
         applyInterAppPublish(InterAppPublishConfiguration(serverName: serverName, enabled: enabled))
     }
 
+    /// Called by `InterAppTextureInput` during tree walk.
+    public mutating func requestInterAppSubscribe(serverName: String) {
+        applyInterAppSubscribe(InterAppSubscribeConfiguration(serverName: serverName))
+    }
+
+    /// Remote inter-app texture leaf draw (`InterAppTextureInput`).
+    public mutating func drawInterAppTextureInput(serverName: String) {
+        requestInterAppSubscribe(serverName: serverName)
+        drawInterAppTextureInputImpl(serverName, nextBlendLayerAlpha())
+    }
+
     /// Legacy full-screen generative path (single sin-style warp, opaque).
     public func drawGenerativeShader() {
         drawShaderLegacy()
@@ -96,6 +113,8 @@ public struct ViewRenderContext {
             drawWaveBody(mode: mode, time: explicitTime)
         case .interAppPublish(let serverName):
             requestInterAppPublish(serverName: serverName)
+        case .interAppSubscribe(let serverName):
+            drawInterAppTextureInput(serverName: serverName)
         case .video(let fileURLString):
             if let url = URL(string: fileURLString) {
                 drawVideo(fileURL: url)

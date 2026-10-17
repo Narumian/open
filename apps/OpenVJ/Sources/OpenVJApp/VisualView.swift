@@ -57,11 +57,11 @@ final class VisualView: NSView {
             fatalError("Visual renderer failed to initialize.")
         }
         self.renderer = renderer
-        interAppController.renderer = renderer
+        interAppController.bootstrapIfNeeded()
         if InterAppTextureSettings.syphonRequestedAtLaunch, let wgpu = renderer as? WGPUVisualRenderer {
             wgpu.rootView = AnyView(OpenVJLiveScene())
+            wgpu.sceneInterAppPublishSuppressed = false
         }
-        interAppController.bootstrapIfNeeded()
         updateDrawableSize()
 
         let timer = Timer(timeInterval: 1.0 / 60.0, repeats: true) { [weak self] _ in
@@ -98,11 +98,14 @@ final class VisualView: NSView {
     }
 
     func setInterAppPublishing(_ enabled: Bool) {
+        InterAppTextureSettings.publishEnabled = enabled
         if let wgpu = renderer as? WGPUVisualRenderer {
             wgpu.sceneInterAppPublishSuppressed = !enabled
         }
-        interAppController.setPublishing(enabled: enabled)
     }
 
-    var isInterAppPublishing: Bool { interAppController.isPublishing }
+    var isInterAppPublishing: Bool {
+        guard let wgpu = renderer as? WGPUVisualRenderer else { return false }
+        return !wgpu.sceneInterAppPublishSuppressed
+    }
 }

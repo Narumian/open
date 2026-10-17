@@ -25,9 +25,10 @@ public final class WGPUVisualRenderer: VisualRenderer {
     private let startTime = CFAbsoluteTimeGetCurrent()
     private var interAppPublisherServerName: String?
     private var videoRenderState: WGPUVideoRenderState?
+    private var interAppInputState: WGPUInterAppTextureInputState?
     private static var didLogMissingInterAppBackend = false
 
-    /// When true, `InterAppTexture` leaves in the scene graph do not configure a publisher (app menu / env gate).
+    /// When true, `InterAppTexture` publish leaves in the scene graph are ignored (menu kill switch).
     public var sceneInterAppPublishSuppressed = false
 
     /// Optional inter-app publisher (Syphon when `OpenVJSyphon` is linked). Off by default on the publisher itself.
@@ -80,6 +81,7 @@ public final class WGPUVisualRenderer: VisualRenderer {
         self.bindGroup = bindGroup
         self.pipeline = pipeline
         videoRenderState = WGPUVideoRenderState(device: device, queue: queue)
+        interAppInputState = WGPUInterAppTextureInputState(device: device, queue: queue)
         interAppPublisher?.attach(device: device, queue: queue)
     }
 
@@ -129,6 +131,10 @@ public final class WGPUVisualRenderer: VisualRenderer {
             interAppPublisher?.resize(width: configuredWidth, height: configuredHeight)
         }
         syncInterAppCopyTexture()
+    }
+
+    func applyInterAppSubscribeConfiguration(_ configuration: SubscriberConfiguration) {
+        interAppInputState?.applySubscribeConfiguration(configuration)
     }
 
     /// Applies `InterAppTexture` visual leaf configuration for the current frame.
@@ -220,6 +226,8 @@ public final class WGPUVisualRenderer: VisualRenderer {
 
         guard let targetView = wgpuTextureCreateView(texture, nil) else { return .skipped }
         defer { wgpuTextureViewRelease(targetView) }
+        interAppInputState?.prepareFrames(surfaceWidth: configuredWidth, surfaceHeight: configuredHeight)
+
         guard let encoder = wgpuDeviceCreateCommandEncoder(device, nil) else { return .skipped }
         defer { wgpuCommandEncoderRelease(encoder) }
 
@@ -273,12 +281,26 @@ public final class WGPUVisualRenderer: VisualRenderer {
                 drawVideo: { [self] fileURL, layerAlpha in
                     videoRenderState?.draw(fileURL: fileURL, layerAlpha: layerAlpha, pass: pass)
                 },
+                drawInterAppTextureInput: { [self] serverName, layerAlpha in
+                    interAppInputState?.draw(
+                        serverName: serverName,
+                        layerAlpha: layerAlpha,
+                        pass: pass,
+                        surfaceWidth: configuredWidth,
+                        surfaceHeight: configuredHeight
+                    )
+                },
                 applyInterAppPublish: { [self] configuration in
                     applyInterAppPublishConfiguration(
                         PublisherConfiguration(
                             serverName: configuration.serverName,
                             enabled: configuration.enabled
                         )
+                    )
+                },
+                applyInterAppSubscribe: { [self] configuration in
+                    applyInterAppSubscribeConfiguration(
+                        SubscriberConfiguration(serverName: configuration.serverName)
                     )
                 }
             )

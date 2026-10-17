@@ -102,7 +102,16 @@ Add {
 }
 ```
 
-During tree walk, `InterAppTexture` configures `InterAppTexturePublisher` via `InterAppTextureRegistry.makePublisher(configuration:)` — the renderer does not call Syphon directly. Without a linked backend, publish is a no-op and OpenVJ logs once.
+During tree walk, `InterAppTexture` configures `InterAppTexturePublisher` via `InterAppTextureRegistry.makePublisher(configuration:)` — the renderer does not call Syphon directly. `OpenVJApp` calls `openVJSyphonBootstrap()` when rendering starts (no app-side Syphon setup). Without a linked backend, publish is a no-op and OpenVJ logs once.
+
+Subscribe from another app’s Syphon server:
+
+```swift
+Mixer {
+    SinBody()
+    InterAppTexture.subscribe("OtherApp")
+}
+```
 
 Syphon-first roadmap and future Spout/NDI backends: [docs/inter-app-texture.md](../../docs/inter-app-texture.md).
 
@@ -128,15 +137,16 @@ OpenVJ exposes inter-app texture sharing in the `OpenVJ` library:
 
 | Type | Role |
 |------|------|
-| `InterAppTexture` | OpenUI view leaf — request publish with a server name |
-| `InterAppTextureRegistry` | Registry + `makePublisher(configuration:)` |
+| `InterAppTexture` | OpenUI leaf — publish with a server name |
+| `InterAppTextureInput` / `InterAppTexture.subscribe` | OpenUI leaf — receive and draw a remote server |
+| `InterAppTextureRegistry` | `makePublisher` / `makeSubscriber` factories |
 | `InterAppTexturePublisher` | Publish WGPU frames to other apps |
-| `InterAppTextureSubscriber` | Stub for future receive path |
-| `OpenVJSyphon` | macOS Syphon backend (optional target) |
+| `InterAppTextureSubscriber` | Import remote frames into WGPU (Syphon when linked) |
+| `OpenVJSyphon` | macOS Syphon publish + subscribe (optional target) |
 
-**Default:** publishing is **off**. No Syphon framework is required for a normal build.
+No Syphon framework is required for a normal build.
 
-### Enable Syphon publish (macOS)
+### Enable Syphon (macOS)
 
 1. Build the Syphon vendor artifact (once):
 
@@ -147,12 +157,14 @@ OpenVJ exposes inter-app texture sharing in the `OpenVJ` library:
 
    Creates `Vendor/Syphon.xcframework` (gitignored). Re-run `swift build` so `Package.swift` links `OpenVJSyphon`.
 
-2. Turn publishing on:
+2. Include `InterAppTexture("OpenVJ")` (or another name) in your scene — the Syphon server appears automatically when clients connect.
 
-   - **Environment:** `OPEN_VJ_SYPHON=1 .build/debug/OpenVJApp` (also selects `OpenVJLiveScene` at startup)
-   - **Menu:** View → **Publish to Syphon** (persists in UserDefaults)
+   Optional conveniences:
 
-Other apps see a server named **OpenVJ** in Syphon clients (e.g. VDMX, Resolume).
+   - **Environment:** `OPEN_VJ_SYPHON=1 .build/debug/OpenVJApp` (selects `OpenVJLiveScene` at startup)
+   - **Menu:** View → **Publish to Syphon** — kill switch for publish leaves (persists in UserDefaults)
+
+Other apps see a server matching the `InterAppTexture` name in Syphon clients (e.g. VDMX, Resolume).
 
 **Resolume:** Sources → Syphon → **OpenVJ**. **VDMX:** Syphon Input → server **OpenVJ**.
 
