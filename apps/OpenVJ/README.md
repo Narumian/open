@@ -31,6 +31,8 @@ Generative content is described with a SwiftUI-like **`Visual`** protocol: recur
 | `TanBody.time(_:)` | Pin tan warp time (`Float` or `CFTimeInterval`) |
 | `OpenVJSceneTime.current` | Frame time written by the renderer (for `.time(...)` at call site) |
 | `ShaderVisual` | Legacy full-screen generative WGSL leaf |
+| `Video` | Local file video leaf (AVFoundation → WGPU texture) |
+| `OpenVJVideoScene` | `Add { Video(...); SinBody() }` example |
 | `GroupVisual` | Transparent container for builder content |
 | `EmptyVisual` | No-op leaf |
 | `AnyVisual` | Type erasure for renderer storage |
@@ -53,6 +55,17 @@ Add {
 ```
 
 Use `OpenVJSceneTime.current` for `t` when you want the renderer’s frame clock, or pass your own `Float` (see `OpenVJTimedDemoScene`).
+
+Local video playback (macOS, `file://` only in v0):
+
+```swift
+Add {
+    Video(path: "/path/to/clip.mov")
+    SinBody()
+}
+```
+
+Assign `AnyVisual(OpenVJVideoScene(videoAt: url))` on `WGPUVisualRenderer.rootVisual` to swap in a video scene. Frames are decoded with `AVPlayer` + `AVPlayerItemVideoOutput`, copied to a BGRA8 WGPU texture each frame, and drawn as a full-screen textured triangle (same layered blend rules as `Add` generative leaves). **v0 limits:** local file URLs only (no HTTP/HLS), no drag-and-drop UI yet, loops on end-of-file, CPU `queue.writeTexture` upload (not zero-copy Metal interop).
 
 Inter-app publish from the scene graph (backend-agnostic; Syphon only when `OpenVJSyphon` is linked):
 

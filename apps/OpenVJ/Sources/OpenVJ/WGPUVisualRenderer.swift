@@ -23,6 +23,7 @@ public final class WGPUVisualRenderer: VisualRenderer {
     private var interAppCopyHeight: UInt32 = 0
     private let startTime = CFAbsoluteTimeGetCurrent()
     private var interAppPublisherServerName: String?
+    private var videoRenderState: WGPUVideoRenderState?
     private static var didLogMissingInterAppBackend = false
 
     /// Optional inter-app publisher (Syphon when `OpenVJSyphon` is linked). Off by default on the publisher itself.
@@ -74,6 +75,7 @@ public final class WGPUVisualRenderer: VisualRenderer {
         self.bindGroupLayout = bindGroupLayout
         self.bindGroup = bindGroup
         self.pipeline = pipeline
+        videoRenderState = WGPUVideoRenderState(device: device, queue: queue)
         interAppPublisher?.attach(device: device, queue: queue)
     }
 
@@ -256,6 +258,9 @@ public final class WGPUVisualRenderer: VisualRenderer {
                     wgpuRenderPassEncoderSetPipeline(pass, drawPipeline)
                     wgpuRenderPassEncoderSetBindGroup(pass, 0, drawBindGroup, 0, nil)
                     wgpuRenderPassEncoderDraw(pass, 3, 1, 0, 0)
+                },
+                drawVideo: { [self] fileURL, layerAlpha in
+                    videoRenderState?.draw(fileURL: fileURL, layerAlpha: layerAlpha, pass: pass)
                 },
                 applyInterAppPublish: { [self] configuration in
                     applyInterAppPublishConfiguration(configuration)

@@ -27,6 +27,7 @@ var targets: [Target] = [
         dependencies: ["CWGPU", "OpenVJApple"],
         path: "Sources/OpenVJ",
         linkerSettings: [
+            .linkedFramework("AVFoundation"),
             .linkedFramework("Metal"),
             .linkedFramework("QuartzCore"),
             .linkedLibrary("c++"),
