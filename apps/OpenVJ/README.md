@@ -207,6 +207,31 @@ Other apps see a server matching the `InterAppTextureOutput` name in Syphon clie
 - Syphon performs its own IOSurface / client delivery; OpenVJ does not call IOSurface directly.
 - Publishing is skipped when no Syphon clients are connected (`hasClients`).
 
+## Headless render (CI / demos)
+
+`OpenVJRender` draws offscreen through a `CAMetalLayer` + wgpu surface — **no `NSWindow`**, no Source Browser panel, no `screencapture`.
+
+```bash
+cd apps/OpenVJ
+swift build
+swift run OpenVJRender --output /tmp/frame.png
+```
+
+Scene selection (`OPEN_VJ_SCENE` or `--scene`):
+
+| Value | Root scene |
+|-------|------------|
+| `default` (default) | `OpenVJDefaultScene` |
+| `source-browser-mixer` | `OpenVJSourceBrowserMixerScene` (GPU mix only; UI not shown) |
+| `live` | `OpenVJLiveScene` |
+| `timed-demo` | `OpenVJTimedDemoScene` |
+
+```bash
+OPEN_VJ_SCENE=source-browser-mixer swift run OpenVJRender --output /tmp/frame.png --frames 3
+```
+
+The tool prints the output path on success. Prefer this over `OPEN_VJ_SOURCE_BROWSER=1` for automated screenshots.
+
 ## Build & run
 
 **Swift Package Manager**
@@ -237,3 +262,4 @@ xcodebuild -scheme OpenVJApp -destination 'platform=macOS' build
 | `OpenVJApple` | Metal-layer → wgpu surface bridge |
 | `OpenVJSyphon` | Syphon publisher backend (when `Vendor/Syphon.xcframework` exists) |
 | `OpenVJApp` | AppKit shell (`VisualView`, 60Hz timer, optional inter-app publish menu) |
+| `OpenVJRender` | Headless CLI: one PNG frame from an offscreen wgpu surface |

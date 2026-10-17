@@ -191,7 +191,12 @@ public final class WGPUVisualRenderer: VisualRenderer {
     }
 
     public func render(frameTime: CFTimeInterval?) -> VisualFrameStatus {
-        guard configuredWidth > 0, configuredHeight > 0 else { return .notConfigured }
+        render(frameTime: frameTime, captureSurfaceBGRA: false).status
+    }
+
+    /// Renders one frame; when `captureSurfaceBGRA` is true, returns tightly packed BGRA8 bytes for the surface.
+    public func render(frameTime: CFTimeInterval?, captureSurfaceBGRA: Bool) -> (status: VisualFrameStatus, bgra: Data?) {
+        guard configuredWidth > 0, configuredHeight > 0 else { return (.notConfigured, nil) }
 
         let time = frameTime ?? (CFAbsoluteTimeGetCurrent() - startTime)
         let elapsed = Float(time)
@@ -208,10 +213,10 @@ public final class WGPUVisualRenderer: VisualRenderer {
             okStatus = .renderedSuboptimal
         default:
             if let texture = surfaceTexture.texture { wgpuTextureRelease(texture) }
-            return .skipped
+            return (.skipped, nil)
         }
 
-        guard let texture = surfaceTexture.texture else { return .skipped }
+        guard let texture = surfaceTexture.texture else { return (.skipped, nil) }
 
         var didPresent = false
         func present() {
@@ -225,11 +230,11 @@ public final class WGPUVisualRenderer: VisualRenderer {
             wgpuTextureRelease(texture)
         }
 
-        guard let targetView = wgpuTextureCreateView(texture, nil) else { return .skipped }
+        guard let targetView = wgpuTextureCreateView(texture, nil) else { return (.skipped, nil) }
         defer { wgpuTextureViewRelease(targetView) }
         interAppInputState?.prepareFrames(surfaceWidth: configuredWidth, surfaceHeight: configuredHeight)
 
-        guard let encoder = wgpuDeviceCreateCommandEncoder(device, nil) else { return .skipped }
+        guard let encoder = wgpuDeviceCreateCommandEncoder(device, nil) else { return (.skipped, nil) }
         defer { wgpuCommandEncoderRelease(encoder) }
 
         var attachment = WGPURenderPassColorAttachment()
@@ -314,7 +319,7 @@ public final class WGPUVisualRenderer: VisualRenderer {
             return true
         }
 
-        guard encoded else { return .skipped }
+        guard encoded else { return (.skipped, nil) }
 
         if let interAppCopyTexture {
             var source = WGPUTexelCopyTextureInfo()
@@ -328,11 +333,22 @@ public final class WGPUVisualRenderer: VisualRenderer {
             wgpuCommandEncoderCopyTextureToTexture(encoder, &source, &destination, &copySize)
         }
 
-        guard let commandBuffer = wgpuCommandEncoderFinish(encoder, nil) else { return .skipped }
+        guard let commandBuffer = wgpuCommandEncoderFinish(encoder, nil) else { return (.skipped, nil) }
         var submitted: WGPUCommandBuffer? = commandBuffer
         withUnsafePointer(to: &submitted) { wgpuQueueSubmit(queue, 1, $0) }
         wgpuCommandBufferRelease(commandBuffer)
         _ = wgpuDevicePoll(device, 0, nil)
+
+        var capturedBGRA: Data?
+        if captureSurfaceBGRA {
+            capturedBGRA = readBGRA8Texture(
+                device: device,
+                queue: queue,
+                texture: texture,
+                width: configuredWidth,
+                height: configuredHeight
+            )
+        }
 
         if let interAppCopyTexture, let interAppPublisher, interAppPublisher.isEnabled {
             interAppPublisher.publish(
@@ -343,7 +359,7 @@ public final class WGPUVisualRenderer: VisualRenderer {
         }
 
         present()
-        return okStatus
+        return (okStatus, capturedBGRA)
     }
 
     private func ensureInterAppCopyTexture(width: UInt32, height: UInt32) {

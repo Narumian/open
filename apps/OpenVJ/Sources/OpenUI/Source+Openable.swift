@@ -15,13 +15,19 @@ public struct OpenedSourceView: View {
     }
 
     public func renderLeaf(in context: inout ViewRenderContext) {
+        context.render(node: flattenedNode())
+    }
+}
+
+extension OpenedSourceView: ViewRepresentable {
+    var viewNode: ViewNode {
         switch descriptor.kind {
         case .localFile(let url):
-            Video(path: url.path).render(in: &context)
+            return .video(fileURL: url.absoluteString)
         case .interAppInput(let serverName):
-            InterAppTextureInput(serverName).render(in: &context)
+            return .interAppSubscribe(serverName: serverName)
         case .url, .captureDevice:
-            EmptyView().render(in: &context)
+            return .empty
         }
     }
 }
@@ -50,11 +56,17 @@ public struct OpenedSelectionView: View {
     }
 
     public func renderLeaf(in context: inout ViewRenderContext) {
+        context.render(node: flattenedNode())
+    }
+}
+
+extension OpenedSelectionView: ViewRepresentable {
+    var viewNode: ViewNode {
         switch selection {
         case .none:
-            EmptyView().render(in: &context)
+            return .empty
         case .source(let descriptor):
-            descriptor.opened().render(in: &context)
+            return descriptor.opened().flattenedNode()
         }
     }
 }

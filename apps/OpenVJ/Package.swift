@@ -44,6 +44,7 @@ var products: [Product] = [
     .library(name: "OpenUI", targets: ["OpenUI"]),
     .library(name: "OpenVJ", targets: ["OpenVJ"]),
     .executable(name: "OpenVJApp", targets: ["OpenVJApp"]),
+    .executable(name: "OpenVJRender", targets: ["OpenVJRender"]),
 ]
 
 if syphonAvailable {
@@ -73,6 +74,21 @@ targets.append(
             .linkedFramework("AppKit"),
             .linkedFramework("QuartzCore"),
             .linkedFramework("Metal"),
+        ]
+    )
+)
+
+targets.append(
+    .executableTarget(
+        name: "OpenVJRender",
+        dependencies: ["OpenVJ", "OpenUI"],
+        path: "Sources/OpenVJRender",
+        linkerSettings: [
+            .linkedFramework("AppKit"),
+            .linkedFramework("QuartzCore"),
+            .linkedFramework("Metal"),
+            .linkedFramework("ImageIO"),
+            .linkedFramework("UniformTypeIdentifiers"),
         ]
     )
 )

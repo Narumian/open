@@ -8,9 +8,10 @@ public struct AnyView: View {
     private let renderImpl: (inout ViewRenderContext) -> Void
 
     public init<V: View>(_ view: V) {
-        node = view.flattenedNode()
+        let flattened = view.flattenedNode()
+        node = flattened
         renderImpl = { context in
-            view.render(in: &context)
+            context.render(node: flattened)
         }
     }
 
