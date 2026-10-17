@@ -84,7 +84,7 @@ Source discovery for the macOS source browser uses `InterAppTextureRegistry.Inpu
 | Before | After |
 |--------|-------|
 | `InterAppTexture("name")` | `Output { InterAppTextureOutput("name") }` |
-| `InterAppTexture.subscribe("name")` | `InterAppTextureInput("name")` or `InterAppTextureInput.subscribe("name")` |
+| `InterAppTexture.subscribe("name")` | `InterAppTextureInput("name")` |
 | `InterAppTextureRegistry.makePublisher` | `InterAppTextureRegistry.Output.makePublisher` |
 | `InterAppTextureRegistry.makeSubscriber` | `InterAppTextureRegistry.Input.makeSubscriber` |
 | `InterAppTextureRegistry.availableInputServers()` | `InterAppTextureRegistry.Input.availableServers()` |

@@ -165,7 +165,7 @@ public final class WGPUVisualRenderer: VisualRenderer {
         interAppPublisher = nil
         interAppPublisherServerName = nil
 
-        if let publisher = InterAppTextureRegistry.makePublisher(configuration: configuration) {
+        if let publisher = InterAppTextureRegistry.Output.makePublisher(configuration: configuration) {
             interAppPublisher = publisher
             interAppPublisherServerName = configuration.serverName
             interAppPublisher?.attach(device: device, queue: queue)

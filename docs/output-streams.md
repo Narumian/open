@@ -49,6 +49,6 @@ Incoming remote frames use `InterAppTextureInput("name")` inside `Mixer`, not in
 
 - **Out:** `InterAppTextureOutput` (was `InterAppTexture`)
 - **In:** `InterAppTextureInput` (unchanged)
-- Subscribe factory: `InterAppTextureInput.subscribe("Server")` (was `InterAppTexture.subscribe`)
+- Subscribe: `InterAppTextureInput("Server")` (was `InterAppTexture.subscribe`)
 
 See also [inter-app-texture.md](inter-app-texture.md).

@@ -108,14 +108,14 @@ Add {
 }
 ```
 
-During tree walk, `InterAppTextureOutput` configures `InterAppTexturePublisher` via `InterAppTextureRegistry.makePublisher(configuration:)` — OpenUI never imports Syphon. `OpenVJApp` bootstraps the optional backend when rendering starts. Without a linked backend, publish is a no-op and OpenVJ logs once.
+During tree walk, `InterAppTextureOutput` configures `InterAppTexturePublisher` via `InterAppTextureRegistry.Output.makePublisher(configuration:)` — OpenUI never imports Syphon. `OpenVJApp` bootstraps the optional backend when rendering starts. Without a linked backend, publish is a no-op and OpenVJ logs once.
 
 Subscribe from another app’s inter-app server:
 
 ```swift
 Mixer {
     SinBody()
-    InterAppTextureInput.subscribe("OtherApp")
+    InterAppTextureInput("OtherApp")
 }
 ```
 
@@ -138,7 +138,7 @@ Mixer {
 
 1. First time the scene graph walks a `SourceBrowser` leaf, the floating **Sources** panel opens (or use **View → Source Browser…**, ⇧⌘B).
 2. The panel lists video files in your Movies folder (or **Choose Folder…** / **Choose File…**).
-3. When an inter-app backend is linked, announced servers appear via `InterAppTextureRegistry.availableInputServers()`; **Add Inter-App Input…** accepts a manual server name.
+3. When an inter-app backend is linked, announced servers appear via `InterAppTextureRegistry.Input.availableServers()`; **Add Inter-App Input…** accepts a manual server name.
 4. Selection is stored in `SourceBrowserState.shared`. Each frame, `SourceBrowser` draws the active choice (`Video` for local files, `InterAppTextureInput` for remote servers) at its mixer layer weight; `Some()` keeps a generative sin layer in the mix.
 
 Launch with the example scene as root:
@@ -167,9 +167,9 @@ OpenVJ exposes inter-app texture sharing in the `OpenVJ` library:
 
 | Type | Role |
 |------|------|
-| `InterAppTexture` | OpenUI leaf — publish with a server name |
-| `InterAppTextureInput` / `InterAppTexture.subscribe` | OpenUI leaf — receive and draw a remote server |
-| `InterAppTextureRegistry` | `makePublisher` / `makeSubscriber` factories |
+| `InterAppTextureOutput` | OpenUI leaf — publish with a server name (`Output { }`) |
+| `InterAppTextureInput` | OpenUI leaf — receive and draw a remote server |
+| `InterAppTextureRegistry.Output` / `.Input` | Publish vs subscribe factories and input discovery |
 | `InterAppTexturePublisher` | Publish WGPU frames to other apps |
 | `InterAppTextureSubscriber` | Import remote frames into WGPU (Syphon when linked) |
 | `OpenVJSyphon` | macOS Syphon publish + subscribe (optional target) |
@@ -187,14 +187,14 @@ No Syphon framework is required for a normal build.
 
    Creates `Vendor/Syphon.xcframework` (gitignored). Re-run `swift build` so `Package.swift` links `OpenVJSyphon`.
 
-2. Include `InterAppTexture("OpenVJ")` (or another name) in your scene — the Syphon server appears automatically when clients connect.
+2. Include `Output { InterAppTextureOutput("OpenVJ") }` (or another name) in your scene — the Syphon server appears automatically when clients connect.
 
    Optional conveniences:
 
    - **Environment:** `OPEN_VJ_INTER_APP_PUBLISH=1 .build/debug/OpenVJApp` (legacy alias `OPEN_VJ_SYPHON=1`; selects `OpenVJLiveScene` at startup)
    - **Menu:** View → **Publish Inter-App Texture** — kill switch for publish leaves (persists in UserDefaults)
 
-Other apps see a server matching the `InterAppTexture` name in Syphon clients (e.g. VDMX, Resolume).
+Other apps see a server matching the `InterAppTextureOutput` name in Syphon clients (e.g. VDMX, Resolume).
 
 **Resolume:** Sources → Syphon → **OpenVJ**. **VDMX:** Syphon Input → server **OpenVJ**.
 
@@ -231,7 +231,7 @@ xcodebuild -scheme OpenVJApp -destination 'platform=macOS' build
 | Target | Role |
 |--------|------|
 | `OpenUI` | SwiftUI-free `View` declaration layer + `ViewRenderContext` |
-| `OpenVJ` | `VisualRenderer` + `WGPUVisualRenderer` + `InterAppTexture` registry |
+| `OpenVJ` | `VisualRenderer` + `WGPUVisualRenderer` + `InterAppTextureRegistry` |
 | `OpenVJApple` | Metal-layer → wgpu surface bridge |
 | `OpenVJSyphon` | Syphon publisher backend (when `Vendor/Syphon.xcframework` exists) |
 | `OpenVJApp` | AppKit shell (`VisualView`, 60Hz timer, optional inter-app publish menu) |
