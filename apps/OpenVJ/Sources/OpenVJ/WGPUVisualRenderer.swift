@@ -1,5 +1,6 @@
 import CWGPU
 import Foundation
+import OpenUI
 import OpenVJApple
 
 public final class WGPUVisualRenderer: VisualRenderer {
@@ -30,7 +31,7 @@ public final class WGPUVisualRenderer: VisualRenderer {
     public var interAppPublisher: InterAppTexturePublisher?
 
     /// Root declarative visual tree rendered each frame.
-    public var rootVisual: AnyVisual = AnyVisual(OpenVJDefaultScene())
+    public var rootView: AnyView = AnyView(OpenVJDefaultScene())
 
     public init?(metalLayer: UnsafeMutableRawPointer) {
         installWGPULoggingOnce()
@@ -245,7 +246,7 @@ public final class WGPUVisualRenderer: VisualRenderer {
                     wgpuQueueWriteBuffer(queue, uniformBuffer, 0, bytes.baseAddress, Self.uniformStride)
                 }
             }
-            var visualContext = VisualRenderContext(
+            var visualContext = ViewRenderContext(
                 frameTime: elapsed,
                 drawShaderLegacy: {
                     writeUniforms(time: elapsed, waveMode: 0, layerAlpha: 1)
@@ -263,10 +264,15 @@ public final class WGPUVisualRenderer: VisualRenderer {
                     videoRenderState?.draw(fileURL: fileURL, layerAlpha: layerAlpha, pass: pass)
                 },
                 applyInterAppPublish: { [self] configuration in
-                    applyInterAppPublishConfiguration(configuration)
+                    applyInterAppPublishConfiguration(
+                        PublisherConfiguration(
+                            serverName: configuration.serverName,
+                            enabled: configuration.enabled
+                        )
+                    )
                 }
             )
-            rootVisual.render(in: &visualContext)
+            rootView.render(in: &visualContext)
             wgpuRenderPassEncoderEnd(pass)
             wgpuRenderPassEncoderRelease(pass)
             return true

@@ -18,31 +18,32 @@ The app depends on **`VisualRenderer`**, not on WebGPU types directly. Backends 
 
 `OpenVJApp` / `VisualView` hold a `VisualRenderer?` and pass a `VisualSurfaceAttachment` from the view’s `CAMetalLayer`. Syphon publishing attaches an `InterAppTexturePublisher` on that protocol. A future non-WGPU backend can register its own factory without changing the app shell.
 
-## Visual / `body` (declarative scene graph)
+## OpenUI / `body` (declarative scene graph)
 
-Generative content is described with a SwiftUI-like **`Visual`** protocol: recursive **`associatedtype Body: Visual`**, **`@VisualBuilder var body`**, and leaf types with **`Body == Never`**.
+Generative content is described with the **`OpenUI`** module: a SwiftUI-free **`View`** protocol with recursive **`associatedtype Body: View`**, **`@ViewBuilder var body`**, and leaf types with **`Body == Never`**. Tree walk uses **`renderLeaf`** and **`ViewRenderContext`** (backend-agnostic draw hooks; WGPU lives in `OpenVJ`).
 
 | Type | Role |
 |------|------|
-| `Visual` | Scene graph protocol |
-| `VisualBuilder` | `@resultBuilder` for tuples, optionals, `if`/`else` |
+| `View` | Scene graph protocol (`import OpenUI`) |
+| `ViewBuilder` | `@resultBuilder` for tuples, optionals, `if`/`else` |
+| `ViewRenderContext` | Backend-neutral draw / publish commands during traversal |
 | `Add` | Stack multiple leaves in tree order (first opaque, later ~55% alpha) |
 | `Mixer` | Equal-weight VJ mix (`1 / N` alpha per child, same render pass) |
 | `SinBody` / `TanBody` | Wave-domain generative leaves (`waveMode` WGSL uniform) |
 | `TanBody.time(_:)` | Pin tan warp time (`Float` or `CFTimeInterval`) |
 | `OpenVJSceneTime.current` | Frame time written by the renderer (for `.time(...)` at call site) |
-| `ShaderVisual` | Legacy full-screen generative WGSL leaf |
+| `ShaderView` | Legacy full-screen generative WGSL leaf |
 | `Video` | Local file video leaf (AVFoundation → WGPU texture) |
 | `OpenVJVideoScene` | `Add { Video(...); SinBody() }` example |
-| `GroupVisual` | Transparent container for builder content |
-| `EmptyVisual` | No-op leaf |
-| `AnyVisual` | Type erasure for renderer storage |
+| `GroupView` | Transparent container for builder content |
+| `EmptyView` | No-op leaf |
+| `AnyView` | Type erasure for renderer storage |
 | `InterAppTexture` | Leaf: request inter-app publish (`InterAppTexture("OpenVJ")`) — no draw |
 | `SomeVisual` | Demo sin wave leaf for publish examples |
 | `OpenVJDefaultScene` | Built-in root scene (`Add { SinBody(); TanBody().time(...) }`) |
 | `OpenVJInterAppTextureScene` | `Add { InterAppTexture("OpenVJ"); SomeVisual() }` |
 | `OpenVJTimedDemoScene` | Same stack with an explicit `time` parameter |
-| `VisualSceneHosting` | `VisualRenderer` + `rootVisual` (`WGPUVisualRenderer`) |
+| `ViewSceneHosting` | `VisualRenderer` + `rootView` (`WGPUVisualRenderer`) |
 
 **`Add` vs `Mixer` (v0):** both use one shared render pass and full-screen draws per child (same WGPU pipelines). They differ only in per-layer opacity:
 
@@ -51,7 +52,7 @@ Generative content is described with a SwiftUI-like **`Visual`** protocol: recur
 | Feel | Stack / overlay | Crossfade / equal mix |
 | First child | 100% alpha | `1 / N` |
 | Later children | ~55% alpha each | `1 / N` each |
-| `VisualNode` | `.group([...])` | `.mixer([...])` |
+| `ViewNode` | `.group([...])` | `.mixer([...])` |
 
 Not GPU additive blend modes yet — src-alpha layering with different weights.
 
@@ -85,7 +86,7 @@ Add {
 }
 ```
 
-Assign `AnyVisual(OpenVJVideoScene(videoAt: url))` on `WGPUVisualRenderer.rootVisual` to swap in a video scene. Frames are decoded with `AVPlayer` + `AVPlayerItemVideoOutput`, copied to a BGRA8 WGPU texture each frame, and drawn as a full-screen textured triangle (same layered blend rules as `Add` generative leaves). **v0 limits:** local file URLs only (no HTTP/HLS), no drag-and-drop UI yet, loops on end-of-file, CPU `queue.writeTexture` upload (not zero-copy Metal interop).
+Assign `AnyView(OpenVJVideoScene(videoAt: url))` on `WGPUVisualRenderer.rootView` to swap in a video scene. Frames are decoded with `AVPlayer` + `AVPlayerItemVideoOutput`, copied to a BGRA8 WGPU texture each frame, and drawn as a full-screen textured triangle (same layered blend rules as `Add` generative leaves). **v0 limits:** local file URLs only (no HTTP/HLS), no drag-and-drop UI yet, loops on end-of-file, CPU `queue.writeTexture` upload (not zero-copy Metal interop).
 
 Inter-app publish from the scene graph (backend-agnostic; Syphon only when `OpenVJSyphon` is linked):
 
@@ -98,7 +99,7 @@ Add {
 
 During tree walk, `InterAppTexture` configures `InterAppTexturePublisher` via `InterAppTextureRegistry.makePublisher(configuration:)` — the renderer does not call Syphon directly. Without a linked backend, publish is a no-op and OpenVJ logs once.
 
-`WGPUVisualRenderer.rootVisual` is traversed each frame; assign `AnyVisual(yourScene)` on a `VisualSceneHosting` renderer to swap scenes without touching the AppKit shell.
+`WGPUVisualRenderer.rootView` is traversed each frame; assign `AnyView(yourScene)` on a `ViewSceneHosting` renderer to swap scenes without touching the AppKit shell.
 
 ## Requirements
 
@@ -120,7 +121,7 @@ OpenVJ exposes inter-app texture sharing in the `OpenVJ` library:
 
 | Type | Role |
 |------|------|
-| `InterAppTexture` | Visual leaf — request publish with a server name |
+| `InterAppTexture` | OpenUI view leaf — request publish with a server name |
 | `InterAppTextureRegistry` | Registry + `makePublisher(configuration:)` |
 | `InterAppTexturePublisher` | Publish WGPU frames to other apps |
 | `InterAppTextureSubscriber` | Stub for future receive path |
@@ -178,7 +179,8 @@ xcodebuild -scheme OpenVJApp -destination 'platform=macOS' build
 
 | Target | Role |
 |--------|------|
-| `OpenVJ` | `Visual` scene graph + `VisualRenderer` + `WGPUVisualRenderer` + `InterAppTexture` |
+| `OpenUI` | SwiftUI-free `View` declaration layer + `ViewRenderContext` |
+| `OpenVJ` | `VisualRenderer` + `WGPUVisualRenderer` + `InterAppTexture` registry |
 | `OpenVJApple` | Metal-layer → wgpu surface bridge |
 | `OpenVJSyphon` | Syphon publisher backend (when `Vendor/Syphon.xcframework` exists) |
 | `OpenVJApp` | AppKit shell (`VisualView`, 60Hz timer, optional Syphon menu) |

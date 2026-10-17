@@ -1,6 +1,6 @@
 import Foundation
 
-public struct TupleVisual2<C0: Visual, C1: Visual>: Visual {
+public struct TupleView2<C0: View, C1: View>: View {
     public let first: C0
     public let second: C1
 
@@ -10,22 +10,22 @@ public struct TupleVisual2<C0: Visual, C1: Visual>: Visual {
     }
 
     public var body: Never {
-        fatalError("TupleVisual2 is a composite container")
+        fatalError("TupleView2 is a composite container")
     }
 
-    public func renderLeaf(in context: inout VisualRenderContext) {
+    public func renderLeaf(in context: inout ViewRenderContext) {
         first.render(in: &context)
         second.render(in: &context)
     }
 }
 
-extension TupleVisual2: VisualRepresentable {
-    var visualNode: VisualNode {
+extension TupleView2: ViewRepresentable {
+    var viewNode: ViewNode {
         .group([first.flattenedNode(), second.flattenedNode()])
     }
 }
 
-public struct TupleVisual3<C0: Visual, C1: Visual, C2: Visual>: Visual {
+public struct TupleView3<C0: View, C1: View, C2: View>: View {
     public let first: C0
     public let second: C1
     public let third: C2
@@ -37,23 +37,23 @@ public struct TupleVisual3<C0: Visual, C1: Visual, C2: Visual>: Visual {
     }
 
     public var body: Never {
-        fatalError("TupleVisual3 is a composite container")
+        fatalError("TupleView3 is a composite container")
     }
 
-    public func renderLeaf(in context: inout VisualRenderContext) {
+    public func renderLeaf(in context: inout ViewRenderContext) {
         first.render(in: &context)
         second.render(in: &context)
         third.render(in: &context)
     }
 }
 
-extension TupleVisual3: VisualRepresentable {
-    var visualNode: VisualNode {
+extension TupleView3: ViewRepresentable {
+    var viewNode: ViewNode {
         .group([first.flattenedNode(), second.flattenedNode(), third.flattenedNode()])
     }
 }
 
-public struct TupleVisual4<C0: Visual, C1: Visual, C2: Visual, C3: Visual>: Visual {
+public struct TupleView4<C0: View, C1: View, C2: View, C3: View>: View {
     public let first: C0
     public let second: C1
     public let third: C2
@@ -67,10 +67,10 @@ public struct TupleVisual4<C0: Visual, C1: Visual, C2: Visual, C3: Visual>: Visu
     }
 
     public var body: Never {
-        fatalError("TupleVisual4 is a composite container")
+        fatalError("TupleView4 is a composite container")
     }
 
-    public func renderLeaf(in context: inout VisualRenderContext) {
+    public func renderLeaf(in context: inout ViewRenderContext) {
         first.render(in: &context)
         second.render(in: &context)
         third.render(in: &context)
@@ -78,8 +78,8 @@ public struct TupleVisual4<C0: Visual, C1: Visual, C2: Visual, C3: Visual>: Visu
     }
 }
 
-extension TupleVisual4: VisualRepresentable {
-    var visualNode: VisualNode {
+extension TupleView4: ViewRepresentable {
+    var viewNode: ViewNode {
         .group([
             first.flattenedNode(),
             second.flattenedNode(),
@@ -89,7 +89,7 @@ extension TupleVisual4: VisualRepresentable {
     }
 }
 
-public struct OptionalVisual<C: Visual>: Visual {
+public struct OptionalView<C: View>: View {
     public let content: C?
 
     public init(_ content: C?) {
@@ -97,21 +97,21 @@ public struct OptionalVisual<C: Visual>: Visual {
     }
 
     public var body: Never {
-        fatalError("OptionalVisual is a composite container")
+        fatalError("OptionalView is a composite container")
     }
 
-    public func renderLeaf(in context: inout VisualRenderContext) {
+    public func renderLeaf(in context: inout ViewRenderContext) {
         content?.render(in: &context)
     }
 }
 
-extension OptionalVisual: VisualRepresentable {
-    var visualNode: VisualNode {
+extension OptionalView: ViewRepresentable {
+    var viewNode: ViewNode {
         content?.flattenedNode() ?? .empty
     }
 }
 
-public struct ConditionalVisual<T: Visual, F: Visual>: Visual {
+public struct ConditionalView<T: View, F: View>: View {
     public enum Storage {
         case trueContent(T)
         case falseContent(F)
@@ -124,10 +124,10 @@ public struct ConditionalVisual<T: Visual, F: Visual>: Visual {
     }
 
     public var body: Never {
-        fatalError("ConditionalVisual is a composite container")
+        fatalError("ConditionalView is a composite container")
     }
 
-    public func renderLeaf(in context: inout VisualRenderContext) {
+    public func renderLeaf(in context: inout ViewRenderContext) {
         switch storage {
         case .trueContent(let content):
             content.render(in: &context)
@@ -137,8 +137,8 @@ public struct ConditionalVisual<T: Visual, F: Visual>: Visual {
     }
 }
 
-extension ConditionalVisual: VisualRepresentable {
-    var visualNode: VisualNode {
+extension ConditionalView: ViewRepresentable {
+    var viewNode: ViewNode {
         switch storage {
         case .trueContent(let content):
             return content.flattenedNode()
@@ -148,7 +148,7 @@ extension ConditionalVisual: VisualRepresentable {
     }
 }
 
-public struct ArrayVisual<C: Visual>: Visual {
+public struct ArrayView<C: View>: View {
     public let elements: [C]
 
     public init(_ elements: [C]) {
@@ -156,18 +156,18 @@ public struct ArrayVisual<C: Visual>: Visual {
     }
 
     public var body: Never {
-        fatalError("ArrayVisual is a composite container")
+        fatalError("ArrayView is a composite container")
     }
 
-    public func renderLeaf(in context: inout VisualRenderContext) {
+    public func renderLeaf(in context: inout ViewRenderContext) {
         for element in elements {
             element.render(in: &context)
         }
     }
 }
 
-extension ArrayVisual: VisualRepresentable {
-    var visualNode: VisualNode {
+extension ArrayView: ViewRepresentable {
+    var viewNode: ViewNode {
         .group(elements.map { $0.flattenedNode() })
     }
 }

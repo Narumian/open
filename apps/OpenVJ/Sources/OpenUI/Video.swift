@@ -3,7 +3,7 @@ import Foundation
 /// Local video file leaf (macOS: AVFoundation decode → WGPU texture each frame).
 ///
 /// **v0:** `file://` URLs only; remote streams and drag-and-drop are not wired yet.
-public struct Video: Visual {
+public struct Video: View {
     public typealias Body = Never
 
     public let fileURL: URL
@@ -24,17 +24,17 @@ public struct Video: Visual {
         fatalError("Video is a leaf")
     }
 
-    public func renderLeaf(in context: inout VisualRenderContext) {
+    public func renderLeaf(in context: inout ViewRenderContext) {
         context.drawVideo(fileURL: fileURL)
     }
 }
 
-extension Video: VisualRepresentable {
-    var visualNode: VisualNode { .video(fileURL: fileURL.absoluteString) }
+extension Video: ViewRepresentable {
+    var viewNode: ViewNode { .video(fileURL: fileURL.absoluteString) }
 }
 
 /// Example scene: video under a light generative overlay.
-public struct OpenVJVideoScene: Visual {
+public struct OpenVJVideoScene: View {
     public let videoURL: URL
 
     public init(videoAt url: URL) {
@@ -45,7 +45,7 @@ public struct OpenVJVideoScene: Visual {
         videoURL = URL(fileURLWithPath: path)
     }
 
-    public var body: Add<TupleVisual2<Video, SinBody>> {
+    public var body: Add<TupleView2<Video, SinBody>> {
         Add {
             Video(url: videoURL)
             SinBody()

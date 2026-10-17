@@ -1,6 +1,6 @@
 import Foundation
 
-/// Frame time written by `WGPUVisualRenderer` before traversing the visual tree.
+/// Frame time written by `WGPUVisualRenderer` before traversing the view tree.
 /// Use with `TanBody().time(OpenVJSceneTime.current)` when the scene graph is built each frame.
 public enum OpenVJSceneTime {
     public static var current: Float = 0
@@ -12,7 +12,7 @@ public enum WaveMode: Float, Sendable {
 }
 
 /// Sin-domain warp generative leaf (`Body == Never`).
-public struct SinBody: Visual {
+public struct SinBody: View {
     public typealias Body = Never
 
     public init() {}
@@ -21,17 +21,17 @@ public struct SinBody: Visual {
         fatalError("SinBody is a leaf")
     }
 
-    public func renderLeaf(in context: inout VisualRenderContext) {
+    public func renderLeaf(in context: inout ViewRenderContext) {
         context.drawWaveBody(mode: .sin, time: nil)
     }
 }
 
-extension SinBody: VisualRepresentable {
-    var visualNode: VisualNode { .waveBody(.sin, explicitTime: nil) }
+extension SinBody: ViewRepresentable {
+    var viewNode: ViewNode { .waveBody(.sin, explicitTime: nil) }
 }
 
 /// Tan-domain warp generative leaf. Optional fixed time via `.time(_:)`.
-public struct TanBody: Visual {
+public struct TanBody: View {
     public typealias Body = Never
 
     public var explicitTime: Float?
@@ -56,13 +56,13 @@ public struct TanBody: Visual {
         time(Float(t))
     }
 
-    public func renderLeaf(in context: inout VisualRenderContext) {
+    public func renderLeaf(in context: inout ViewRenderContext) {
         context.drawWaveBody(mode: .tan, time: explicitTime)
     }
 }
 
-extension TanBody: VisualRepresentable {
-    var visualNode: VisualNode {
+extension TanBody: ViewRepresentable {
+    var viewNode: ViewNode {
         .waveBody(.tan, explicitTime: explicitTime)
     }
 }

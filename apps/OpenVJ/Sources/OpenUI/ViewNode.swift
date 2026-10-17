@@ -1,26 +1,26 @@
 import Foundation
 
-/// Type-erased visual tree for storage and backend traversal.
-public enum VisualNode: Equatable, Sendable {
+/// Type-erased view tree for storage and backend traversal.
+public enum ViewNode: Equatable, Sendable {
     case empty
     case generativeShader
     case waveBody(WaveMode, explicitTime: Float?)
     case interAppPublish(serverName: String)
     case video(fileURL: String)
     /// Sequential stack (`Add`): first child full opacity, later layers ~55%.
-    case group([VisualNode])
+    case group([ViewNode])
     /// Equal-weight mix (`Mixer`): each child uses opacity `1 / N`.
-    case mixer([VisualNode])
+    case mixer([ViewNode])
 }
 
-protocol VisualRepresentable {
-    var visualNode: VisualNode { get }
+protocol ViewRepresentable {
+    var viewNode: ViewNode { get }
 }
 
-extension Visual {
-    public func flattenedNode() -> VisualNode {
-        if let representable = self as? any VisualRepresentable {
-            return representable.visualNode
+extension View {
+    public func flattenedNode() -> ViewNode {
+        if let representable = self as? any ViewRepresentable {
+            return representable.viewNode
         }
         if Body.self == Never.self {
             return .empty

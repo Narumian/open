@@ -1,7 +1,18 @@
 import Foundation
 
-/// Backend-neutral draw commands issued while traversing a `Visual` tree.
-public struct VisualRenderContext {
+/// Backend-neutral configuration for inter-app texture publish during tree walk.
+public struct InterAppPublishConfiguration: Sendable {
+    public var serverName: String
+    public var enabled: Bool
+
+    public init(serverName: String, enabled: Bool = true) {
+        self.serverName = serverName
+        self.enabled = enabled
+    }
+}
+
+/// Backend-neutral draw commands issued while traversing a `View` tree.
+public struct ViewRenderContext {
     public var frameTime: Float
 
     private var blendLayerIndex: Int
@@ -11,14 +22,14 @@ public struct VisualRenderContext {
     private let drawShaderLegacy: () -> Void
     private let drawWaveBodyImpl: (WaveMode, Float, Float) -> Void
     private let drawVideoImpl: (URL, Float) -> Void
-    private let applyInterAppPublish: (PublisherConfiguration) -> Void
+    private let applyInterAppPublish: (InterAppPublishConfiguration) -> Void
 
-    init(
+    public init(
         frameTime: Float,
         drawShaderLegacy: @escaping () -> Void,
         drawWaveBody: @escaping (WaveMode, Float, Float) -> Void,
         drawVideo: @escaping (URL, Float) -> Void,
-        applyInterAppPublish: @escaping (PublisherConfiguration) -> Void
+        applyInterAppPublish: @escaping (InterAppPublishConfiguration) -> Void
     ) {
         self.frameTime = frameTime
         blendLayerIndex = 0
@@ -53,9 +64,9 @@ public struct VisualRenderContext {
         savedBlendLayerIndex = nil
     }
 
-    /// Called by the `InterAppTexture` visual leaf during tree walk.
+    /// Called by the `InterAppTexture` view leaf during tree walk.
     public mutating func requestInterAppPublish(serverName: String, enabled: Bool = true) {
-        applyInterAppPublish(PublisherConfiguration(serverName: serverName, enabled: enabled))
+        applyInterAppPublish(InterAppPublishConfiguration(serverName: serverName, enabled: enabled))
     }
 
     /// Legacy full-screen generative path (single sin-style warp, opaque).
@@ -75,7 +86,7 @@ public struct VisualRenderContext {
     }
 
     /// Renders a flattened node tree using the same draw hooks as the declarative API.
-    public mutating func render(node: VisualNode) {
+    public mutating func render(node: ViewNode) {
         switch node {
         case .empty:
             break

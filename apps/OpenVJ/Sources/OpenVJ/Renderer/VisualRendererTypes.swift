@@ -1,4 +1,5 @@
 import Foundation
+import OpenUI
 
 /// Frame outcome from a visual render pass (backend-agnostic).
 public enum VisualFrameStatus: Equatable, Sendable {
@@ -32,12 +33,12 @@ public extension VisualRenderer {
     }
 }
 
-/// Renderers that draw a declarative `Visual` tree (default WebGPU implementation).
-public protocol VisualSceneHosting: VisualRenderer {
-    var rootVisual: AnyVisual { get set }
+/// Renderers that draw a declarative `OpenUI.View` tree (default WebGPU implementation).
+public protocol ViewSceneHosting: VisualRenderer {
+    var rootView: AnyView { get set }
 }
 
-extension WGPUVisualRenderer: VisualSceneHosting {}
+extension WGPUVisualRenderer: ViewSceneHosting {}
 
 /// Registry and factory for `VisualRenderer` backends (default: WebGPU when linked). Mirrors `InterAppTextureRegistry`.
 public enum VisualRender {

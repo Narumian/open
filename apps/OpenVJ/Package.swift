@@ -13,6 +13,10 @@ var targets: [Target] = [
         path: "Vendor/CWGPU.xcframework"
     ),
     .target(
+        name: "OpenUI",
+        path: "Sources/OpenUI"
+    ),
+    .target(
         name: "OpenVJApple",
         dependencies: ["CWGPU"],
         path: "Sources/OpenVJApple",
@@ -24,7 +28,7 @@ var targets: [Target] = [
     ),
     .target(
         name: "OpenVJ",
-        dependencies: ["CWGPU", "OpenVJApple"],
+        dependencies: ["CWGPU", "OpenVJApple", "OpenUI"],
         path: "Sources/OpenVJ",
         linkerSettings: [
             .linkedFramework("AVFoundation"),
@@ -37,6 +41,7 @@ var targets: [Target] = [
 
 var openVJAppDependencies: [Target.Dependency] = ["OpenVJ"]
 var products: [Product] = [
+    .library(name: "OpenUI", targets: ["OpenUI"]),
     .library(name: "OpenVJ", targets: ["OpenVJ"]),
     .executable(name: "OpenVJApp", targets: ["OpenVJApp"]),
 ]
