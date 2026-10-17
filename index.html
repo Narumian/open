@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="ja">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>JSwift REPL</title>
+    <style>
+      :root {
+        font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+        color-scheme: dark;
+      }
+      body {
+        margin: 0;
+        padding: 1rem;
+        background: #0f1115;
+        color: #e6e8ec;
+      }
+      h1 {
+        font-size: 1.1rem;
+        font-weight: 600;
+      }
+      textarea,
+      pre {
+        width: 100%;
+        box-sizing: border-box;
+        border: 1px solid #2a2f3a;
+        border-radius: 6px;
+        background: #161a22;
+        color: inherit;
+        padding: 0.75rem;
+      }
+      textarea {
+        min-height: 8rem;
+        resize: vertical;
+      }
+      pre {
+        min-height: 6rem;
+        white-space: pre-wrap;
+      }
+      button {
+        margin: 0.5rem 0 1rem;
+        padding: 0.45rem 0.9rem;
+        border-radius: 6px;
+        border: 1px solid #3d4658;
+        background: #252b38;
+        color: inherit;
+        cursor: pointer;
+      }
+      button:hover {
+        background: #2f3646;
+      }
+      .hint {
+        font-size: 0.85rem;
+        opacity: 0.75;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>JSwift REPL (Phase 1)</h1>
+    <p class="hint">⌘/Ctrl+Enter で実行。例: <code>let x = 1</code> と <code>print(x)</code></p>
+    <textarea id="source">let x = 1 + 2
+print(x)</textarea>
+    <button id="run" type="button">Run</button>
+    <pre id="output" aria-live="polite"></pre>
+    <script type="module" src="/src/repl/main.js"></script>
+  </body>
+</html>
