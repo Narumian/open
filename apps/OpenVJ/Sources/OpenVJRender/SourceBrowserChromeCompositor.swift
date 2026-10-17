@@ -8,7 +8,10 @@ import OpenUI
 enum SourceBrowserChromeCompositor {
     static let panelWidth = 360
     private static let background = (r: 26, g: 26, b: 26)
+    private static let headerBar = (r: 34, g: 34, b: 38)
     private static let panelBorder = (r: 48, g: 48, b: 52)
+    private static let folderGlyphFace = (r: 96, g: 168, b: 255)
+    private static let folderGlyphTab = (r: 72, g: 132, b: 210)
     private static let titleText = (r: 238, g: 238, b: 238)
     private static let bodyText = (r: 238, g: 238, b: 238)
     private static let mutedText = (r: 170, g: 170, b: 175)
@@ -63,6 +66,20 @@ enum SourceBrowserChromeCompositor {
                 g: background.g,
                 b: background.b
             )
+            fillRect(
+                base,
+                width: width,
+                height: height,
+                x: 0,
+                y: 0,
+                w: panelWidth,
+                h: titleBarHeight,
+                r: headerBar.r,
+                g: headerBar.g,
+                b: headerBar.b
+            )
+            fillRect(base, width: width, height: height, x: 0, y: 0, w: 1, h: height, r: panelBorder.r, g: panelBorder.g, b: panelBorder.b)
+            fillRect(base, width: width, height: height, x: panelWidth - 1, y: 0, w: 1, h: height, r: panelBorder.r, g: panelBorder.g, b: panelBorder.b)
             drawVerticalDivider(base, width: width, height: height, x: panelWidth - 1)
 
             drawTitle("Sources", in: base, width: width, height: height)
@@ -106,20 +123,39 @@ enum SourceBrowserChromeCompositor {
                     )
                 }
 
-                let label = rows[rowIndex].title
+                if showsFolderGlyph(rows[rowIndex]) {
+                    drawFolderGlyph(base, width: width, height: height, x: 10, y: y + 8)
+                }
+
+                let label = rowLabel(rows[rowIndex])
                 let textColor: (r: Int, g: Int, b: Int) = isSelected ? rowSelectedText : bodyText
                 drawText(
                     label,
                     in: base,
                     width: width,
                     height: height,
-                    x: 12,
+                    x: 34,
                     y: y + 6,
-                    maxWidth: panelWidth - 20,
+                    maxWidth: panelWidth - 42,
                     color: textColor,
                     fontSize: 13,
                     weight: isSelected ? .semibold : .regular
                 )
+
+                if !isSelected {
+                    fillRect(
+                        base,
+                        width: width,
+                        height: height,
+                        x: 8,
+                        y: y + rowHeight - 1,
+                        w: panelWidth - 16,
+                        h: 1,
+                        r: divider.r,
+                        g: divider.g,
+                        b: divider.b
+                    )
+                }
             }
 
             if rows.count > visibleRows {
@@ -244,6 +280,32 @@ enum SourceBrowserChromeCompositor {
         fillRect(base, width: width, height: height, x: x, y: 0, w: 1, h: height, r: divider.r, g: divider.g, b: divider.b)
     }
 
+    private static func showsFolderGlyph(_ row: SourceBrowserListModel.Row) -> Bool {
+        if case .source(let descriptor) = row.selection, case .localFile = descriptor.kind {
+            return true
+        }
+        return false
+    }
+
+    private static func rowLabel(_ row: SourceBrowserListModel.Row) -> String {
+        let title = row.title
+        if title.hasPrefix("📁 ") {
+            return String(title.dropFirst(2))
+        }
+        return title
+    }
+
+    private static func drawFolderGlyph(
+        _ base: UnsafeMutablePointer<UInt8>,
+        width: Int,
+        height: Int,
+        x: Int,
+        y: Int
+    ) {
+        fillRect(base, width: width, height: height, x: x, y: y + 3, w: 16, h: 11, r: folderGlyphFace.r, g: folderGlyphFace.g, b: folderGlyphFace.b)
+        fillRect(base, width: width, height: height, x: x, y: y, w: 8, h: 4, r: folderGlyphTab.r, g: folderGlyphTab.g, b: folderGlyphTab.b)
+    }
+
     private static func drawTitle(_ title: String, in base: UnsafeMutablePointer<UInt8>, width: Int, height: Int) {
         drawText(
             title,
@@ -339,7 +401,7 @@ enum SourceBrowserChromeCompositor {
                 let alpha = scratch[si + 3]
                 guard alpha > 0 else { continue }
                 let dx = x + col
-                let dy = y + row
+                let dy = y + (drawHeight - 1 - row)
                 guard dx >= 0, dy >= 0, dx < width, dy < height else { continue }
                 let di = (dy * width + dx) * 4
                 let srcB = scratch[si]

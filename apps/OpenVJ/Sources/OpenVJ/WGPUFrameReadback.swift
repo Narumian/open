@@ -84,17 +84,14 @@ func readBGRA8Texture(
         return nil
     }
 
-    if paddedBytesPerRow == tightBytesPerRow {
-        return padded
-    }
-
+    // WebGPU/Metal framebuffer rows are bottom-up; PNG and CPU chrome use top-left origin.
     var tight = Data(count: tightBytesPerRow * Int(height))
     tight.withUnsafeMutableBytes { dest in
         guard let destBase = dest.baseAddress else { return }
         padded.withUnsafeBytes { src in
             guard let srcBase = src.baseAddress else { return }
             for row in 0 ..< Int(height) {
-                let srcRow = srcBase.advanced(by: row * paddedBytesPerRow)
+                let srcRow = srcBase.advanced(by: (Int(height) - 1 - row) * paddedBytesPerRow)
                 let destRow = destBase.advanced(by: row * tightBytesPerRow)
                 destRow.copyMemory(from: srcRow, byteCount: tightBytesPerRow)
             }
