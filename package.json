@@ -1,9 +1,9 @@
 {
-  "name": "jswift",
+  "name": "open",
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "description": "JSwift — Swift-like DSL that transpiles to JavaScript",
+  "description": "Open monorepo — browser Swift-like DSL (REPL) and shared docs",
   "scripts": {
     "dev": "vite",
     "build": "vite build",

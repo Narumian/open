@@ -2,7 +2,7 @@ import { createConsole } from "./drivers/console.js";
 import { createTimer } from "./drivers/timer.js";
 
 /**
- * Runtime surface injected into generated JS as `JSwift`.
+ * Runtime surface injected into generated JS as `Open`.
  * @param {{ console?: ReturnType<typeof createConsole> }} [parts]
  */
 export function createRuntime(parts = {}) {

@@ -16,7 +16,7 @@ function emitExpr(node) {
       }
       const args = node.args.map(emitExpr).join(", ");
       if (node.callee.name === "sleep") {
-        return `await JSwift.sleep(${args})`;
+        return `await Open.sleep(${args})`;
       }
       return `${node.callee.name}(${args})`;
     }

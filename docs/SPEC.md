@@ -1,6 +1,8 @@
-# JSwift grammar subset v0.1
+# Open grammar subset v0.1
 
 Phase 1: statements with blocks, Swift-style `func`, conditionals, and arithmetic.
+
+Implementation package: `src/jswift/`.
 
 ## Statements
 
@@ -34,20 +36,20 @@ argList     ::= expression (',' expression)*
 
 ## Built-ins
 
-| JSwift | Generated JS | Notes |
-|--------|----------------|-------|
+| Open source | Generated JS | Notes |
+|-------------|----------------|-------|
 | `print(e)` | `console.log(e)` | REPL captures output |
-| `sleep(ms)` | `await JSwift.sleep(ms)` | Timer driver (`setTimeout`) |
+| `sleep(ms)` | `await Open.sleep(ms)` | Timer driver (`setTimeout`) |
 
-## Runtime (`JSwift`)
+## Runtime (`Open`)
 
-Host injects a `JSwift` object into generated code:
+Host injects an `Open` object into generated code:
 
 | API | Driver | Behavior |
 |-----|--------|----------|
-| `JSwift.sleep(ms)` | `src/jswift/drivers/timer.js` | Promise; resolves after `ms` milliseconds |
-| `JSwift.now()` | same | `performance.now()` |
-| `JSwift.log(...)` | `src/jswift/drivers/console.js` | Optional; `print` uses `console.log` directly |
+| `Open.sleep(ms)` | `src/jswift/drivers/timer.js` | Promise; resolves after `ms` milliseconds |
+| `Open.now()` | same | `performance.now()` |
+| `Open.log(...)` | `src/jswift/drivers/console.js` | Optional; `print` uses `console.log` directly |
 
 REPL wraps emitted JS in an `async` IIFE so `await` is valid when `sleep` is used.
 

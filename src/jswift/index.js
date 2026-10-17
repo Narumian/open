@@ -3,7 +3,7 @@ import { parse } from "./parse.js";
 import { codegen } from "./codegen.js";
 import { JSwiftError } from "./errors.js";
 
-/** @param {string} source JSwift source */
+/** @param {string} source Open DSL source */
 export function compile(source) {
   const tokens = tokenize(source);
   const ast = parse(tokens);

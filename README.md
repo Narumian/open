@@ -1,31 +1,68 @@
-# JSwift
+# Open
 
-**JSwift** は JavaScript 上で Swift 風 DSL を動かすエンジン（パーサ → JS 生成 → ブラウザ/Node で実行）です。Apple Swift の互換実行ではなく、**厳選した Swift 風セマンティクス**を ECMAScript に載せるプロジェクトです。
+**Open** is a monorepo for Narumian’s “open surface” stack: declarative visuals on macOS and a **Swift-like browser DSL** that transpiles to JavaScript. Official repo: [github.com/Narumian/open](https://github.com/Narumian/open).
 
-- 構想・アーキテクチャ・フェーズ: [docs/SPEC.md](./docs/SPEC.md)（文法 v0）。全体コンセプトは Open Project の `jswift.md`。
-- 公式リポ: https://github.com/Narumian/open
+| Track | What it is | Where |
+|-------|------------|--------|
+| **OpenVJ** / **OpenUI** | macOS generative VJ via WebGPU; declarative `View` scene graph | [`apps/OpenVJ`](./apps/OpenVJ) (**v0.1.0** — see [OpenVJ README](./apps/OpenVJ/README.md)) |
+| **Open** (browser DSL) | Parse → JS codegen → REPL; not Apple Swift compatibility | Root npm package, [`docs/SPEC.md`](./docs/SPEC.md), implementation package [`src/jswift/`](./src/jswift/) |
 
-## Phase 1（このリポ）
+One-page synthesis: [docs/open.md](./docs/open.md).
 
-- `src/jswift/` — トークナイザ・パーサ・JS コード生成（`let` / `var`、`print(...)`、四則演算）
-- `public/index.html` — ブラウザ REPL
-- `docs/SPEC.md` — 文法サブセット v0
+---
 
-## ローカルで動かす
+## Open (browser DSL) — quickstart
+
+Swift-style subset (Phase 1): `let` / `var`, `print`, `if` / `else`, `func`, arithmetic, `sleep(ms)`.
 
 ```bash
 npm install
-npm run dev    # Vite → http://localhost:5173
-npm test       # トランスパイルのスモークテスト
+npm run dev    # Vite → http://localhost:5173 (Open REPL)
+npm test       # transpile smoke tests
 ```
 
-REPL で例:
+REPL example:
 
 ```swift
 let x = 1 + 2
 print(x)
+
+func greet(_ name: String) {
+  print(name)
+}
+greet("Open")
 ```
 
-## ライセンス
+Grammar and runtime: [docs/SPEC.md](./docs/SPEC.md).
+
+---
+
+## OpenVJ — quickstart
+
+macOS app + **OpenUI** module for generative scenes (~60fps WebGPU). **v0.1.0** milestone.
+
+```bash
+cd apps/OpenVJ
+swift build
+swift run OpenVJApp
+```
+
+Details, scene examples, and architecture: [apps/OpenVJ/README.md](./apps/OpenVJ/README.md).
+
+---
+
+## Repo layout
+
+```text
+apps/OpenVJ/     OpenVJ app, OpenUI, WebGPU renderer
+src/jswift/      Open DSL engine (tokenizer, parser, codegen, drivers)
+src/repl/        Browser REPL entry
+docs/            SPEC, open.md, shared design notes
+public/          Static assets for Vite
+```
+
+---
+
+## License
 
 TBD

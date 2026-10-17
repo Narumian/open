@@ -29,7 +29,7 @@ async function run() {
   const js = result.js;
   outputEl.textContent += `// generated\n${js}\n\n`;
 
-  const JSwift = createRuntime({
+  const Open = createRuntime({
     console: createConsole({
       log: (...args) => {
         const line = args.map((a) => String(a)).join(" ");
@@ -41,11 +41,11 @@ async function run() {
 
   try {
     const fn = new Function(
-      "JSwift",
+      "Open",
       "console",
       `"use strict";\nreturn (async () => {\n${js}\n})();`,
     );
-    await fn(JSwift, console);
+    await fn(Open, console);
   } catch (err) {
     outputEl.textContent += `${formatError(err)}\n`;
   }

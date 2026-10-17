@@ -52,7 +52,7 @@ add(1, 2);`,
   );
 });
 
-test("sleep maps to JSwift.sleep", () => {
+test("sleep maps to Open.sleep", () => {
   const js = compile("sleep(10)");
-  assert.equal(js, "await JSwift.sleep(10);");
+  assert.equal(js, "await Open.sleep(10);");
 });
