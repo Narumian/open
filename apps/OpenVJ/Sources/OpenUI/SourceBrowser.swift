@@ -2,39 +2,27 @@ import Foundation
 
 /// Declarative source-picker leaf (macOS UI is hosted in `OpenVJApp`).
 ///
-/// During tree walk this leaf:
-/// 1. Requests the AppKit source browser panel (once per scene attachment).
-/// 2. Draws the current `SourceCatalogRegistry.selectionState.selection`.
+/// Catalog → `SourceSelectionState` → `SourceRendering` (single path via `SourceCatalogRegistry`).
 ///
 /// v0: no GPU draw when selection is `.none` (mixer sibling layers still render).
 public struct SourceBrowser: View {
     public typealias Body = Never
 
     public let mediaFolderURL: URL?
-    private let catalog: (any SourceCatalog)?
 
     public init() {
         mediaFolderURL = nil
-        catalog = nil
     }
 
     public init(mediaFolder: URL) {
         mediaFolderURL = mediaFolder
-        catalog = nil
     }
 
     public init(mediaFolderPath: String) {
         mediaFolderURL = URL(fileURLWithPath: mediaFolderPath)
-        catalog = nil
     }
 
     public init(mediaFolderURL: URL?) {
-        self.mediaFolderURL = mediaFolderURL
-        catalog = nil
-    }
-
-    public init(catalog: any SourceCatalog, mediaFolderURL: URL? = nil) {
-        self.catalog = catalog
         self.mediaFolderURL = mediaFolderURL
     }
 
@@ -43,8 +31,12 @@ public struct SourceBrowser: View {
     }
 
     public func renderLeaf(in context: inout ViewRenderContext) {
-        let activeCatalog = catalog ?? SourceCatalogRegistry.current
-        let selectionState = activeCatalog?.selectionState ?? SourceCatalogRegistry.selectionState
+        Self.presentAndDraw(mediaFolderURL: mediaFolderURL, in: &context)
+    }
+
+    /// Shared walk for the declarative leaf and flattened `ViewNode.sourceBrowser`.
+    static func presentAndDraw(mediaFolderURL: URL?, in context: inout ViewRenderContext) {
+        let selectionState = SourceCatalogRegistry.selectionState
         if let folder = mediaFolderURL {
             selectionState.mediaFolderURL = folder
         }

@@ -16,14 +16,21 @@ Hosts register a `SourceCatalog` at launch. The `SourceBrowser()` view walks the
 | `SourceCatalog` | `refresh()`, `sources`, `selectionState` |
 | `SourceCatalogRegistry` | `register(_:)` / `current` — set from the app target |
 | `SourceBrowser` | Leaf view: present UI + render selection |
+| `Openable` | `opened()` maps a value to a declarative `View` leaf |
+
+### `Openable` vs `Source` vs `SourceBrowser`
+
+- **`Source`** — catalog row protocol (`id`, `displayName`, `kind`). Hosts list `ListedSource` (or custom conformers) from `SourceCatalog`.
+- **`Openable`** — turns a chosen `SourceDescriptor` or `SourceSelection` into draw leaves (`Video`, `InterAppTextureInput`, or `EmptyView` for none / unsupported kinds). `SourceRendering` calls `selection.opened().render(...)` so kind→leaf mapping lives in one place.
+- **`SourceBrowser`** — scene leaf: opens host UI, keeps `SourceSelectionState`, then renders via `SourceRendering` (catalog → selection → `opened()`).
 
 ### Render mapping
 
-During tree walk, `SourceBrowser` maps the active selection to existing leaves internally:
+`SourceDescriptor.opened()` (via `SourceSelection.opened()`):
 
-- `SourceKind.localFile` → `Video` draw path
-- `SourceKind.interAppInput` → `InterAppTextureInput` draw path
-- `.url` / `.captureDevice` → no-op on macOS v0
+- `SourceKind.localFile` → `Video`
+- `SourceKind.interAppInput` → `InterAppTextureInput`
+- `.none` / `.url` / `.captureDevice` → `EmptyView` (no draw on macOS v0)
 
 ## macOS (`OpenVJApp`)
 

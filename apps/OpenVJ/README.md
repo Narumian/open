@@ -139,7 +139,9 @@ Mixer {
 1. First time the scene graph walks a `SourceBrowser` leaf, the floating **Sources** panel opens (or use **View → Source Browser…**, ⇧⌘B).
 2. The panel lists video files in your Movies folder (or **Choose Folder…** / **Choose File…**).
 3. When an inter-app backend is linked, announced servers appear via `InterAppTextureRegistry.Input.availableServers()`; **Add Inter-App Input…** accepts a manual server name.
-4. Selection is stored in `SourceSelectionState.shared` (via `SourceCatalogRegistry`). Each frame, `SourceBrowser` draws the active choice (`Video` for local files, `InterAppTextureInput` for remote servers) at its mixer layer weight; `Some()` keeps a generative sin layer in the mix.
+4. Selection is stored in `SourceSelectionState.shared` (via `SourceCatalogRegistry`). Each frame, `SourceBrowser` renders `SourceSelection.opened()` (`Video`, `InterAppTextureInput`, or `EmptyView`) at its mixer layer weight; `Some()` keeps a generative sin layer in the mix.
+
+See [docs/source-catalog.md](../../docs/source-catalog.md) for `Source`, `Openable`, and `SourceBrowser` roles.
 
 Launch with the example scene as root:
 

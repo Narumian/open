@@ -8,11 +8,12 @@ final class MacSourceCatalog: SourceCatalog {
 
     private let lock = NSLock()
     private var _sources: [ListedSource] = []
-    private var _mediaFolderURL: URL?
 
     init(selectionState: SourceSelectionState = .shared) {
         self.selectionState = selectionState
-        _mediaFolderURL = selectionState.mediaFolderURL
+        if selectionState.mediaFolderURL == nil {
+            selectionState.mediaFolderURL = Self.defaultMediaFolder()
+        }
         refresh()
     }
 
@@ -23,28 +24,18 @@ final class MacSourceCatalog: SourceCatalog {
     }
 
     var mediaFolderURL: URL? {
-        get {
-            lock.lock()
-            defer { lock.unlock() }
-            return _mediaFolderURL ?? selectionState.mediaFolderURL
-        }
+        get { selectionState.mediaFolderURL }
         set {
-            lock.lock()
-            _mediaFolderURL = newValue
-            lock.unlock()
             selectionState.mediaFolderURL = newValue
             refresh()
         }
     }
 
     func refresh() {
-        var next: [ListedSource] = []
-        let folder = mediaFolderURL ?? Self.defaultMediaFolder()
+        let folder = selectionState.mediaFolderURL ?? Self.defaultMediaFolder()
         selectionState.mediaFolderURL = folder
-        lock.lock()
-        _mediaFolderURL = folder
-        lock.unlock()
 
+        var next: [ListedSource] = []
         let urls = (try? FileManager.default.contentsOfDirectory(
             at: folder,
             includingPropertiesForKeys: [.isRegularFileKey],

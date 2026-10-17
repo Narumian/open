@@ -145,9 +145,7 @@ public struct ViewRenderContext {
                 drawVideo(fileURL: url)
             }
         case .sourceBrowser:
-            let selectionState = SourceCatalogRegistry.selectionState
-            requestSourceBrowser(SourceBrowserConfiguration(mediaFolderURL: selectionState.mediaFolderURL))
-            SourceRendering.draw(selection: selectionState.selection, in: &self)
+            SourceBrowser.presentAndDraw(mediaFolderURL: nil, in: &self)
         case .group(let children):
             for child in children {
                 render(node: child)

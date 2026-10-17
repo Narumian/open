@@ -1,11 +1,5 @@
 import Foundation
 
-@available(*, deprecated, renamed: "SourceSelection")
-public typealias SourceBrowserSelection = SourceSelection
-
-@available(*, deprecated, renamed: "SourceSelectionState")
-public typealias SourceBrowserState = SourceSelectionState
-
 /// AppKit registers a presenter here; core targets stay free of AppKit.
 public enum SourceBrowserUI {
     public typealias PresentHandler = (SourceBrowserConfiguration) -> Void
