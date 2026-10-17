@@ -26,7 +26,8 @@ Generative content is described with a SwiftUI-like **`Visual`** protocol: recur
 |------|------|
 | `Visual` | Scene graph protocol |
 | `VisualBuilder` | `@resultBuilder` for tuples, optionals, `if`/`else` |
-| `Add` | Compose multiple leaves in tree order (layered full-screen draws) |
+| `Add` | Stack multiple leaves in tree order (first opaque, later ~55% alpha) |
+| `Mixer` | Equal-weight VJ mix (`1 / N` alpha per child, same render pass) |
 | `SinBody` / `TanBody` | Wave-domain generative leaves (`waveMode` WGSL uniform) |
 | `TanBody.time(_:)` | Pin tan warp time (`Float` or `CFTimeInterval`) |
 | `OpenVJSceneTime.current` | Frame time written by the renderer (for `.time(...)` at call site) |
@@ -43,14 +44,33 @@ Generative content is described with a SwiftUI-like **`Visual`** protocol: recur
 | `OpenVJTimedDemoScene` | Same stack with an explicit `time` parameter |
 | `VisualSceneHosting` | `VisualRenderer` + `rootVisual` (`WGPUVisualRenderer`) |
 
-**`Add` v0:** one shared render pass; each child draws a full-screen triangle in tree order. Later draws use src-alpha blending (~55% opacity) so stacked bodies stay visible. Not GPU additive blend yet.
+**`Add` vs `Mixer` (v0):** both use one shared render pass and full-screen draws per child (same WGPU pipelines). They differ only in per-layer opacity:
 
-Example (matches the default scene shape):
+| | `Add` | `Mixer` |
+|---|--------|---------|
+| Feel | Stack / overlay | Crossfade / equal mix |
+| First child | 100% alpha | `1 / N` |
+| Later children | ~55% alpha each | `1 / N` each |
+| `VisualNode` | `.group([...])` | `.mixer([...])` |
+
+Not GPU additive blend modes yet — src-alpha layering with different weights.
+
+Example (default scene shape — stacked sin + tan):
 
 ```swift
 Add {
     SinBody()
     TanBody().time(t)
+}
+```
+
+Equal-weight mix (three layers at `1/3` opacity each):
+
+```swift
+Mixer {
+    SinBody()
+    TanBody().time(t)
+    Video(path: "/path/to/clip.mov")
 }
 ```
 

@@ -7,7 +7,10 @@ public enum VisualNode: Equatable, Sendable {
     case waveBody(WaveMode, explicitTime: Float?)
     case interAppPublish(serverName: String)
     case video(fileURL: String)
+    /// Sequential stack (`Add`): first child full opacity, later layers ~55%.
     case group([VisualNode])
+    /// Equal-weight mix (`Mixer`): each child uses opacity `1 / N`.
+    case mixer([VisualNode])
 }
 
 protocol VisualRepresentable {

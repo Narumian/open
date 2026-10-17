@@ -5,6 +5,9 @@ public struct VisualRenderContext {
     public var frameTime: Float
 
     private var blendLayerIndex: Int
+    private var equalWeightMixLayerCount: Int?
+    private var savedEqualWeightMixLayerCount: Int?
+    private var savedBlendLayerIndex: Int?
     private let drawShaderLegacy: () -> Void
     private let drawWaveBodyImpl: (WaveMode, Float, Float) -> Void
     private let drawVideoImpl: (URL, Float) -> Void
@@ -19,6 +22,7 @@ public struct VisualRenderContext {
     ) {
         self.frameTime = frameTime
         blendLayerIndex = 0
+        equalWeightMixLayerCount = nil
         self.drawShaderLegacy = drawShaderLegacy
         drawWaveBodyImpl = drawWaveBody
         drawVideoImpl = drawVideo
@@ -26,9 +30,27 @@ public struct VisualRenderContext {
     }
 
     private mutating func nextBlendLayerAlpha() -> Float {
+        if let layerCount = equalWeightMixLayerCount, layerCount > 0 {
+            blendLayerIndex += 1
+            return 1 / Float(layerCount)
+        }
         let alpha: Float = blendLayerIndex == 0 ? 1 : 0.55
         blendLayerIndex += 1
         return alpha
+    }
+
+    mutating func beginEqualWeightMix(layerCount: Int) {
+        savedEqualWeightMixLayerCount = equalWeightMixLayerCount
+        savedBlendLayerIndex = blendLayerIndex
+        equalWeightMixLayerCount = max(1, layerCount)
+        blendLayerIndex = 0
+    }
+
+    mutating func endEqualWeightMix() {
+        equalWeightMixLayerCount = savedEqualWeightMixLayerCount
+        blendLayerIndex = savedBlendLayerIndex ?? 0
+        savedEqualWeightMixLayerCount = nil
+        savedBlendLayerIndex = nil
     }
 
     /// Called by the `InterAppTexture` visual leaf during tree walk.
@@ -71,6 +93,12 @@ public struct VisualRenderContext {
             for child in children {
                 render(node: child)
             }
+        case .mixer(let children):
+            beginEqualWeightMix(layerCount: children.count)
+            for child in children {
+                render(node: child)
+            }
+            endEqualWeightMix()
         }
     }
 }
