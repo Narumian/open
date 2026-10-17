@@ -29,6 +29,8 @@ Generative content is described with the **`OpenUI`** module: a SwiftUI-free **`
 | `ViewRenderContext` | Backend-neutral draw / publish commands during traversal |
 | `Add` | Stack multiple leaves in tree order (first opaque, later ~55% alpha) |
 | `Mixer` | Equal-weight VJ mix (`1 / N` alpha per child, same render pass) |
+| `MatrixSwitcher` | One active bus at a time (hard cut); children are inputs |
+| `MatrixSwitcherBus` | Shared mutable bus index (`selection:` on `MatrixSwitcher`) |
 | `SinBody` / `TanBody` | Wave-domain generative leaves (`waveMode` WGSL uniform) |
 | `TanBody.time(_:)` | Pin tan warp time (`Float` or `CFTimeInterval`) |
 | `OpenVJSceneTime.current` | Frame time written by the renderer (for `.time(...)` at call site) |
@@ -47,16 +49,17 @@ Generative content is described with the **`OpenUI`** module: a SwiftUI-free **`
 | `OpenVJTimedDemoScene` | Same stack with an explicit `time` parameter |
 | `ViewSceneHosting` | `VisualRenderer` + `rootView` (`WGPUVisualRenderer`) |
 
-**`Add` vs `Mixer` (v0):** both use one shared render pass and full-screen draws per child (same WGPU pipelines). They differ only in per-layer opacity:
+**`Add` vs `Mixer` vs `MatrixSwitcher` (v0):** `Add` and `Mixer` draw **every** child each frame (same pass, different alphas). `MatrixSwitcher` draws **only** the active bus (hard cut, full opacity).
 
-| | `Add` | `Mixer` |
-|---|--------|---------|
-| Feel | Stack / overlay | Crossfade / equal mix |
-| First child | 100% alpha | `1 / N` |
-| Later children | ~55% alpha each | `1 / N` each |
-| `ViewNode` | `.group([...])` | `.mixer([...])` |
+| | `Add` | `Mixer` | `MatrixSwitcher` |
+|---|--------|---------|------------------|
+| Feel | Stack / overlay | Crossfade / equal mix | Bus / matrix switch |
+| Children per frame | All | All | One (`activeIndex`) |
+| First child | 100% alpha | `1 / N` | 100% when selected |
+| Later children | ~55% alpha each | `1 / N` each | Hidden until selected |
+| `ViewNode` | `.group([...])` | `.mixer([...])` | `.matrixSwitcher(..., activeIndex:)` |
 
-Not GPU additive blend modes yet — src-alpha layering with different weights.
+Not GPU additive blend modes yet — src-alpha layering with different weights (`Add` / `Mixer` only).
 
 Example (default scene shape — stacked sin + tan):
 
@@ -74,6 +77,28 @@ Mixer {
     SinBody()
     TanBody().time(t)
     Video(path: "/path/to/clip.mov")
+}
+```
+
+Matrix bus switch (one input visible; default bus `0`):
+
+```swift
+MatrixSwitcher {
+    Video(path: "a.mov")
+    SinBody()
+    InterAppTextureInput("Resolume")
+}
+```
+
+Drive the bus from your app (`MatrixSwitcherBus` is the SwiftUI-free stand-in for `Binding<Int>`):
+
+```swift
+let bus = MatrixSwitcherBus(activeIndex: 0)
+// bus.activeIndex = 1  // keyboard / OSC / UI
+MatrixSwitcher(selection: bus) {
+    Video(path: "a.mov")
+    SinBody()
+    InterAppTextureInput("Resolume")
 }
 ```
 
@@ -102,9 +127,31 @@ Add {
 }
 ```
 
-During tree walk, `InterAppTexture` configures `InterAppTexturePublisher` via `InterAppTextureRegistry.makePublisher(configuration:)` — the renderer does not call Syphon directly. Without a linked backend, publish is a no-op and OpenVJ logs once.
+During tree walk, `InterAppTexture` configures `InterAppTexturePublisher` via `InterAppTextureRegistry.makePublisher(configuration:)` — the renderer does not call Syphon directly. `OpenVJApp` calls `openVJSyphonBootstrap()` when rendering starts (no app-side Syphon setup). Without a linked backend, publish is a no-op and OpenVJ logs once.
 
-Syphon-first roadmap and future Spout/NDI backends: [docs/inter-app-texture.md](../../docs/inter-app-texture.md).
+Subscribe from another app’s Syphon server:
+
+```swift
+Mixer {
+    SinBody()
+    InterAppTexture.subscribe("OtherApp")
+}
+```
+
+Syphon-first roadmap and future Spout/NDI backends: [docs/inter-app-texture.md](../../docs/inter-app-texture.md). Virtual camera (`VirtualCamera`, `VirtualCameraRegistry`, optional `OpenVJVirtualCam`): [docs/virtual-camera.md](../../docs/virtual-camera.md).
+
+```swift
+Add {
+    VirtualCamera("OpenVJ")
+    InterAppTexture("OpenVJ")
+    Mixer {
+        SinBody()
+        InterAppTextureInput("OtherApp")
+    }
+}
+```
+
+Built-in `OpenVJVirtualCamMixScene` matches this shape.
 
 `WGPUVisualRenderer.rootView` is traversed each frame; assign `AnyView(yourScene)` on a `ViewSceneHosting` renderer to swap scenes without touching the AppKit shell.
 
@@ -128,15 +175,17 @@ OpenVJ exposes inter-app texture sharing in the `OpenVJ` library:
 
 | Type | Role |
 |------|------|
-| `InterAppTexture` | OpenUI view leaf — request publish with a server name |
-| `InterAppTextureRegistry` | Registry + `makePublisher(configuration:)` |
+| `InterAppTexture` | OpenUI leaf — publish with a server name |
+| `VirtualCamera` | OpenUI leaf — publish composited frames to virtual camera backend |
+| `InterAppTextureInput` / `InterAppTexture.subscribe` | OpenUI leaf — receive and draw a remote server |
+| `InterAppTextureRegistry` | `makePublisher` / `makeSubscriber` factories |
 | `InterAppTexturePublisher` | Publish WGPU frames to other apps |
-| `InterAppTextureSubscriber` | Stub for future receive path |
-| `OpenVJSyphon` | macOS Syphon backend (optional target) |
+| `InterAppTextureSubscriber` | Import remote frames into WGPU (Syphon when linked) |
+| `OpenVJSyphon` | macOS Syphon publish + subscribe (optional target) |
 
-**Default:** publishing is **off**. No Syphon framework is required for a normal build.
+No Syphon framework is required for a normal build.
 
-### Enable Syphon publish (macOS)
+### Enable Syphon (macOS)
 
 1. Build the Syphon vendor artifact (once):
 
@@ -147,12 +196,14 @@ OpenVJ exposes inter-app texture sharing in the `OpenVJ` library:
 
    Creates `Vendor/Syphon.xcframework` (gitignored). Re-run `swift build` so `Package.swift` links `OpenVJSyphon`.
 
-2. Turn publishing on:
+2. Include `InterAppTexture("OpenVJ")` (or another name) in your scene — the Syphon server appears automatically when clients connect.
 
-   - **Environment:** `OPEN_VJ_SYPHON=1 .build/debug/OpenVJApp` (also selects `OpenVJLiveScene` at startup)
-   - **Menu:** View → **Publish to Syphon** (persists in UserDefaults)
+   Optional conveniences:
 
-Other apps see a server named **OpenVJ** in Syphon clients (e.g. VDMX, Resolume).
+   - **Environment:** `OPEN_VJ_SYPHON=1 .build/debug/OpenVJApp` (selects `OpenVJLiveScene` at startup)
+   - **Menu:** View → **Publish to Syphon** — kill switch for publish leaves (persists in UserDefaults)
+
+Other apps see a server matching the `InterAppTexture` name in Syphon clients (e.g. VDMX, Resolume).
 
 **Resolume:** Sources → Syphon → **OpenVJ**. **VDMX:** Syphon Input → server **OpenVJ**.
 
@@ -192,4 +243,8 @@ xcodebuild -scheme OpenVJApp -destination 'platform=macOS' build
 | `OpenVJ` | `VisualRenderer` + `WGPUVisualRenderer` + `InterAppTexture` registry |
 | `OpenVJApple` | Metal-layer → wgpu surface bridge |
 | `OpenVJSyphon` | Syphon publisher backend (when `Vendor/Syphon.xcframework` exists) |
-| `OpenVJApp` | AppKit shell (`VisualView`, 60Hz timer, optional Syphon menu) |
+| `OpenVJVirtualCam` | Virtual camera publisher (v0 stub; always buildable, no vendor SDK) |
+| `OpenVJApp` | Default **non-常駐** host (`VisualView`, 60Hz timer, optional Syphon menu) |
+| `OpenVJAgent` | *(future)* Menu-bar 常駐 host running the same `rootView` — not in repo v0 |
+
+`OpenVJApp` is the default host: virtual camera and Syphon exist only while the app runs and the scene includes the publish leaves. Use a future `OpenVJAgent` only if the camera must stay registered when the main window is closed.

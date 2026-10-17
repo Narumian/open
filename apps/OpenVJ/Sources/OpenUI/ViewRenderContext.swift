@@ -11,6 +11,17 @@ public struct InterAppPublishConfiguration: Sendable {
     }
 }
 
+/// Backend-neutral configuration for virtual-camera publish during tree walk.
+public struct VirtualCameraPublishConfiguration: Sendable {
+    public var cameraLabel: String
+    public var enabled: Bool
+
+    public init(cameraLabel: String, enabled: Bool = true) {
+        self.cameraLabel = cameraLabel
+        self.enabled = enabled
+    }
+}
+
 /// Backend-neutral draw commands issued while traversing a `View` tree.
 public struct ViewRenderContext {
     public var frameTime: Float
@@ -22,14 +33,20 @@ public struct ViewRenderContext {
     private let drawShaderLegacy: () -> Void
     private let drawWaveBodyImpl: (WaveMode, Float, Float) -> Void
     private let drawVideoImpl: (URL, Float) -> Void
+    private let drawInterAppTextureInputImpl: (String, Float) -> Void
     private let applyInterAppPublish: (InterAppPublishConfiguration) -> Void
+    private let applyInterAppSubscribe: (InterAppSubscribeConfiguration) -> Void
+    private let applyVirtualCameraPublish: (VirtualCameraPublishConfiguration) -> Void
 
     public init(
         frameTime: Float,
         drawShaderLegacy: @escaping () -> Void,
         drawWaveBody: @escaping (WaveMode, Float, Float) -> Void,
         drawVideo: @escaping (URL, Float) -> Void,
-        applyInterAppPublish: @escaping (InterAppPublishConfiguration) -> Void
+        drawInterAppTextureInput: @escaping (String, Float) -> Void = { _, _ in },
+        applyInterAppPublish: @escaping (InterAppPublishConfiguration) -> Void,
+        applyInterAppSubscribe: @escaping (InterAppSubscribeConfiguration) -> Void = { _ in },
+        applyVirtualCameraPublish: @escaping (VirtualCameraPublishConfiguration) -> Void = { _ in }
     ) {
         self.frameTime = frameTime
         blendLayerIndex = 0
@@ -37,7 +54,10 @@ public struct ViewRenderContext {
         self.drawShaderLegacy = drawShaderLegacy
         drawWaveBodyImpl = drawWaveBody
         drawVideoImpl = drawVideo
+        drawInterAppTextureInputImpl = drawInterAppTextureInput
         self.applyInterAppPublish = applyInterAppPublish
+        self.applyInterAppSubscribe = applyInterAppSubscribe
+        self.applyVirtualCameraPublish = applyVirtualCameraPublish
     }
 
     private mutating func nextBlendLayerAlpha() -> Float {
@@ -69,6 +89,22 @@ public struct ViewRenderContext {
         applyInterAppPublish(InterAppPublishConfiguration(serverName: serverName, enabled: enabled))
     }
 
+    /// Called by the `VirtualCamera` view leaf during tree walk.
+    public mutating func requestVirtualCameraPublish(cameraLabel: String, enabled: Bool = true) {
+        applyVirtualCameraPublish(VirtualCameraPublishConfiguration(cameraLabel: cameraLabel, enabled: enabled))
+    }
+
+    /// Called by `InterAppTextureInput` during tree walk.
+    public mutating func requestInterAppSubscribe(serverName: String) {
+        applyInterAppSubscribe(InterAppSubscribeConfiguration(serverName: serverName))
+    }
+
+    /// Remote inter-app texture leaf draw (`InterAppTextureInput`).
+    public mutating func drawInterAppTextureInput(serverName: String) {
+        requestInterAppSubscribe(serverName: serverName)
+        drawInterAppTextureInputImpl(serverName, nextBlendLayerAlpha())
+    }
+
     /// Legacy full-screen generative path (single sin-style warp, opaque).
     public func drawGenerativeShader() {
         drawShaderLegacy()
@@ -96,6 +132,10 @@ public struct ViewRenderContext {
             drawWaveBody(mode: mode, time: explicitTime)
         case .interAppPublish(let serverName):
             requestInterAppPublish(serverName: serverName)
+        case .virtualCameraPublish(let cameraLabel):
+            requestVirtualCameraPublish(cameraLabel: cameraLabel)
+        case .interAppSubscribe(let serverName):
+            drawInterAppTextureInput(serverName: serverName)
         case .video(let fileURLString):
             if let url = URL(string: fileURLString) {
                 drawVideo(fileURL: url)
@@ -110,6 +150,10 @@ public struct ViewRenderContext {
                 render(node: child)
             }
             endEqualWeightMix()
+        case .matrixSwitcher(let children, let activeIndex):
+            guard !children.isEmpty else { break }
+            let index = min(max(0, activeIndex), children.count - 1)
+            render(node: children[index])
         }
     }
 }

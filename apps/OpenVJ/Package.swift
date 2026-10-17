@@ -37,12 +37,23 @@ var targets: [Target] = [
             .linkedLibrary("c++"),
         ]
     ),
+    .target(
+        name: "OpenVJVirtualCam",
+        dependencies: ["OpenVJ", "CWGPU"],
+        path: "Sources/OpenVJVirtualCam",
+        linkerSettings: [
+            .linkedFramework("CoreMedia"),
+            .linkedFramework("CoreMediaIO"),
+            .linkedFramework("Metal"),
+        ]
+    ),
 ]
 
-var openVJAppDependencies: [Target.Dependency] = ["OpenVJ"]
+var openVJAppDependencies: [Target.Dependency] = ["OpenVJ", "OpenVJVirtualCam"]
 var products: [Product] = [
     .library(name: "OpenUI", targets: ["OpenUI"]),
     .library(name: "OpenVJ", targets: ["OpenVJ"]),
+    .library(name: "OpenVJVirtualCam", targets: ["OpenVJVirtualCam"]),
     .executable(name: "OpenVJApp", targets: ["OpenVJApp"]),
 ]
 

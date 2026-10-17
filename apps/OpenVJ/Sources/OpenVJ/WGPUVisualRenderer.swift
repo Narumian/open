@@ -24,14 +24,20 @@ public final class WGPUVisualRenderer: VisualRenderer {
     private var interAppCopyHeight: UInt32 = 0
     private let startTime = CFAbsoluteTimeGetCurrent()
     private var interAppPublisherServerName: String?
+    private var virtualCameraPublisherLabel: String?
     private var videoRenderState: WGPUVideoRenderState?
+    private var interAppInputState: WGPUInterAppTextureInputState?
     private static var didLogMissingInterAppBackend = false
+    private static var didLogMissingVirtualCamBackend = false
 
-    /// When true, `InterAppTexture` leaves in the scene graph do not configure a publisher (app menu / env gate).
+    /// When true, `InterAppTexture` publish leaves in the scene graph are ignored (menu kill switch).
     public var sceneInterAppPublishSuppressed = false
 
     /// Optional inter-app publisher (Syphon when `OpenVJSyphon` is linked). Off by default on the publisher itself.
     public var interAppPublisher: InterAppTexturePublisher?
+
+    /// Optional virtual-camera publisher (`OpenVJVirtualCam` when linked).
+    public var virtualCameraPublisher: VirtualCameraPublisher?
 
     /// Root declarative visual tree rendered each frame.
     public var rootView: AnyView = AnyView(OpenVJDefaultScene())
@@ -80,12 +86,15 @@ public final class WGPUVisualRenderer: VisualRenderer {
         self.bindGroup = bindGroup
         self.pipeline = pipeline
         videoRenderState = WGPUVideoRenderState(device: device, queue: queue)
+        interAppInputState = WGPUInterAppTextureInputState(device: device, queue: queue)
         interAppPublisher?.attach(device: device, queue: queue)
+        virtualCameraPublisher?.attach(device: device, queue: queue)
     }
 
     deinit {
         releaseInterAppCopyTexture()
         interAppPublisher?.detach()
+        virtualCameraPublisher?.detach()
         wgpuRenderPipelineRelease(pipeline)
         wgpuBindGroupRelease(bindGroup)
         wgpuBindGroupLayoutRelease(bindGroupLayout)
@@ -113,8 +122,9 @@ public final class WGPUVisualRenderer: VisualRenderer {
         wgpuSurfaceConfigure(surface, &configuration)
         configuredWidth = width
         configuredHeight = height
-        syncInterAppCopyTexture()
+        syncCompositedCopyTexture()
         interAppPublisher?.resize(width: width, height: height)
+        virtualCameraPublisher?.resize(width: width, height: height)
         return true
     }
 
@@ -128,10 +138,54 @@ public final class WGPUVisualRenderer: VisualRenderer {
         if configuredWidth > 0, configuredHeight > 0 {
             interAppPublisher?.resize(width: configuredWidth, height: configuredHeight)
         }
-        syncInterAppCopyTexture()
+        syncCompositedCopyTexture()
+    }
+
+    /// Applies `VirtualCamera` visual leaf configuration for the current frame.
+    func applyVirtualCameraPublishConfiguration(_ configuration: VirtualCameraConfiguration) {
+        guard configuration.enabled else {
+            virtualCameraPublisher?.detach()
+            virtualCameraPublisher = nil
+            virtualCameraPublisherLabel = nil
+            syncCompositedCopyTexture()
+            return
+        }
+
+        if let virtualCameraPublisher,
+           virtualCameraPublisherLabel == nil || virtualCameraPublisherLabel == configuration.cameraLabel
+        {
+            virtualCameraPublisherLabel = configuration.cameraLabel
+            virtualCameraPublisher.isEnabled = true
+            syncCompositedCopyTexture()
+            return
+        }
+
+        virtualCameraPublisher?.detach()
+        virtualCameraPublisher = nil
+        virtualCameraPublisherLabel = nil
+
+        if let publisher = VirtualCameraRegistry.makePublisher(configuration: configuration) {
+            virtualCameraPublisher = publisher
+            virtualCameraPublisherLabel = configuration.cameraLabel
+            virtualCameraPublisher?.attach(device: device, queue: queue)
+            if configuredWidth > 0, configuredHeight > 0 {
+                virtualCameraPublisher?.resize(width: configuredWidth, height: configuredHeight)
+            }
+            syncCompositedCopyTexture()
+        } else if !Self.didLogMissingVirtualCamBackend {
+            Self.didLogMissingVirtualCamBackend = true
+            fputs(
+                "[OpenVJ] Virtual camera publish requested but no backend is linked (e.g. OpenVJVirtualCam).\n",
+                stderr
+            )
+        }
     }
 
     /// Applies `InterAppTexture` visual leaf configuration for the current frame.
+    func applyInterAppSubscribeConfiguration(_ configuration: SubscriberConfiguration) {
+        interAppInputState?.applySubscribeConfiguration(configuration)
+    }
+
     func applyInterAppPublishConfiguration(_ configuration: PublisherConfiguration) {
         if sceneInterAppPublishSuppressed {
             if interAppPublisher != nil {
@@ -150,7 +204,7 @@ public final class WGPUVisualRenderer: VisualRenderer {
         {
             interAppPublisherServerName = configuration.serverName
             interAppPublisher.isEnabled = true
-            syncInterAppCopyTexture()
+            syncCompositedCopyTexture()
             return
         }
 
@@ -165,7 +219,7 @@ public final class WGPUVisualRenderer: VisualRenderer {
             if configuredWidth > 0, configuredHeight > 0 {
                 interAppPublisher?.resize(width: configuredWidth, height: configuredHeight)
             }
-            syncInterAppCopyTexture()
+            syncCompositedCopyTexture()
         } else if !Self.didLogMissingInterAppBackend {
             Self.didLogMissingInterAppBackend = true
             fputs(
@@ -175,8 +229,12 @@ public final class WGPUVisualRenderer: VisualRenderer {
         }
     }
 
-    private func syncInterAppCopyTexture() {
-        guard interAppPublisher?.isEnabled == true, configuredWidth > 0, configuredHeight > 0 else {
+    private func syncCompositedCopyTexture() {
+        let needsCopy =
+            (interAppPublisher?.isEnabled == true || virtualCameraPublisher?.isEnabled == true)
+            && configuredWidth > 0
+            && configuredHeight > 0
+        guard needsCopy else {
             releaseInterAppCopyTexture()
             return
         }
@@ -220,6 +278,8 @@ public final class WGPUVisualRenderer: VisualRenderer {
 
         guard let targetView = wgpuTextureCreateView(texture, nil) else { return .skipped }
         defer { wgpuTextureViewRelease(targetView) }
+        interAppInputState?.prepareFrames(surfaceWidth: configuredWidth, surfaceHeight: configuredHeight)
+
         guard let encoder = wgpuDeviceCreateCommandEncoder(device, nil) else { return .skipped }
         defer { wgpuCommandEncoderRelease(encoder) }
 
@@ -273,10 +333,32 @@ public final class WGPUVisualRenderer: VisualRenderer {
                 drawVideo: { [self] fileURL, layerAlpha in
                     videoRenderState?.draw(fileURL: fileURL, layerAlpha: layerAlpha, pass: pass)
                 },
+                drawInterAppTextureInput: { [self] serverName, layerAlpha in
+                    interAppInputState?.draw(
+                        serverName: serverName,
+                        layerAlpha: layerAlpha,
+                        pass: pass,
+                        surfaceWidth: configuredWidth,
+                        surfaceHeight: configuredHeight
+                    )
+                },
                 applyInterAppPublish: { [self] configuration in
                     applyInterAppPublishConfiguration(
                         PublisherConfiguration(
                             serverName: configuration.serverName,
+                            enabled: configuration.enabled
+                        )
+                    )
+                },
+                applyInterAppSubscribe: { [self] configuration in
+                    applyInterAppSubscribeConfiguration(
+                        SubscriberConfiguration(serverName: configuration.serverName)
+                    )
+                },
+                applyVirtualCameraPublish: { [self] configuration in
+                    applyVirtualCameraPublishConfiguration(
+                        VirtualCameraConfiguration(
+                            cameraLabel: configuration.cameraLabel,
                             enabled: configuration.enabled
                         )
                     )
@@ -310,6 +392,14 @@ public final class WGPUVisualRenderer: VisualRenderer {
 
         if let interAppCopyTexture, let interAppPublisher, interAppPublisher.isEnabled {
             interAppPublisher.publish(
+                texture: interAppCopyTexture,
+                width: configuredWidth,
+                height: configuredHeight
+            )
+        }
+
+        if let interAppCopyTexture, let virtualCameraPublisher, virtualCameraPublisher.isEnabled {
+            virtualCameraPublisher.publish(
                 texture: interAppCopyTexture,
                 width: configuredWidth,
                 height: configuredHeight

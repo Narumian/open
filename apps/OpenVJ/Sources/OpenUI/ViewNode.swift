@@ -6,11 +6,15 @@ public enum ViewNode: Equatable, Sendable {
     case generativeShader
     case waveBody(WaveMode, explicitTime: Float?)
     case interAppPublish(serverName: String)
+    case virtualCameraPublish(cameraLabel: String)
+    case interAppSubscribe(serverName: String)
     case video(fileURL: String)
     /// Sequential stack (`Add`): first child full opacity, later layers ~55%.
     case group([ViewNode])
     /// Equal-weight mix (`Mixer`): each child uses opacity `1 / N`.
     case mixer([ViewNode])
+    /// Bus matrix (`MatrixSwitcher`): one active child index, hard cut (v0).
+    case matrixSwitcher([ViewNode], activeIndex: Int)
 }
 
 protocol ViewRepresentable {
