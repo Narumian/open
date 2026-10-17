@@ -5,7 +5,7 @@ import OpenVJSyphon
 #endif
 
 final class InterAppTextureController {
-    weak var renderer: WGPUVisualRenderer?
+    weak var renderer: VisualRenderer?
     private var publisher: InterAppTexturePublisher?
 
     var isPublishing: Bool { publisher?.isEnabled ?? false }

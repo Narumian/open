@@ -3,7 +3,7 @@ import OpenVJ
 import QuartzCore
 
 final class VisualView: NSView {
-    private var renderer: WGPUVisualRenderer?
+    private var renderer: VisualRenderer?
     private var timer: Timer?
     private var lastDrawableSize = CGSize.zero
     private let interAppController = InterAppTextureController()
@@ -51,8 +51,9 @@ final class VisualView: NSView {
     private func startRenderingIfNeeded() {
         guard let metalLayer, renderer == nil else { return }
         let layerPointer = Unmanaged.passUnretained(metalLayer).toOpaque()
-        guard let renderer = WGPUVisualRenderer(metalLayer: layerPointer) else {
-            fatalError("WebGPU renderer failed to initialize.")
+        let attachment = VisualSurfaceAttachment(metalLayer: layerPointer)
+        guard let renderer = VisualRender.makeRenderer(attachment: attachment) else {
+            fatalError("Visual renderer failed to initialize.")
         }
         self.renderer = renderer
         interAppController.renderer = renderer

@@ -4,6 +4,20 @@ Standalone macOS generative visuals via **WebGPU** ([wgpu-native](https://github
 
 Rendering uses a `CAMetalLayer` surface with wgpu’s Metal backend — not a direct `MTKView` Metal renderer.
 
+## Renderer abstraction
+
+The app depends on **`VisualRenderer`**, not on WebGPU types directly. Backends are created through **`VisualRender.makeRenderer(attachment:)`** (same registry pattern as `InterAppTexture`).
+
+| Type | Role |
+|------|------|
+| `VisualRenderer` | Protocol: `configure`, `render(frameTime:)`, `setInterAppPublisher` |
+| `VisualFrameStatus` | Backend-agnostic frame outcome |
+| `VisualSurfaceAttachment` | Surface handle (`metalLayer` on macOS) |
+| `VisualRender` | Factory + optional `registerRendererFactory` override |
+| `WGPUVisualRenderer` | Default WebGPU implementation (registered automatically) |
+
+`OpenVJApp` / `VisualView` hold a `VisualRenderer?` and pass a `VisualSurfaceAttachment` from the view’s `CAMetalLayer`. Syphon publishing attaches an `InterAppTexturePublisher` on that protocol. A future non-WGPU backend can register its own factory without changing the app shell.
+
 ## Requirements
 
 - macOS 13+
@@ -81,7 +95,7 @@ xcodebuild -scheme OpenVJApp -destination 'platform=macOS' build
 
 | Target | Role |
 |--------|------|
-| `OpenVJ` | WebGPU renderer (`WGPUVisualRenderer`) + `InterAppTexture` protocols |
+| `OpenVJ` | `VisualRenderer` + `WGPUVisualRenderer` + `InterAppTexture` protocols |
 | `OpenVJApple` | Metal-layer → wgpu surface bridge |
 | `OpenVJSyphon` | Syphon publisher backend (when `Vendor/Syphon.xcframework` exists) |
 | `OpenVJApp` | AppKit shell (`VisualView`, 60Hz timer, optional Syphon menu) |

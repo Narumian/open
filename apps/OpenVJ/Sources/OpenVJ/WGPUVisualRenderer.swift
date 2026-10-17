@@ -2,14 +2,7 @@ import CWGPU
 import Foundation
 import OpenVJApple
 
-public enum WGPUVisualFrameStatus: Equatable, Sendable {
-    case rendered
-    case renderedSuboptimal
-    case notConfigured
-    case skipped
-}
-
-public final class WGPUVisualRenderer {
+public final class WGPUVisualRenderer: VisualRenderer {
     private static let surfaceFormat = WGPUTextureFormat_BGRA8Unorm
     private static let uniformStride = 16
 
@@ -132,10 +125,11 @@ public final class WGPUVisualRenderer {
         ensureInterAppCopyTexture(width: configuredWidth, height: configuredHeight)
     }
 
-    public func render() -> WGPUVisualFrameStatus {
+    public func render(frameTime: CFTimeInterval?) -> VisualFrameStatus {
         guard configuredWidth > 0, configuredHeight > 0 else { return .notConfigured }
 
-        let elapsed = Float(CFAbsoluteTimeGetCurrent() - startTime)
+        let time = frameTime ?? (CFAbsoluteTimeGetCurrent() - startTime)
+        let elapsed = Float(time)
         let uniforms: (Float, Float, Float, Float) = (
             elapsed,
             Float(configuredWidth),
@@ -149,7 +143,7 @@ public final class WGPUVisualRenderer {
         var surfaceTexture = WGPUSurfaceTexture()
         wgpuSurfaceGetCurrentTexture(surface, &surfaceTexture)
 
-        let okStatus: WGPUVisualFrameStatus
+        let okStatus: VisualFrameStatus
         switch surfaceTexture.status {
         case WGPUSurfaceGetCurrentTextureStatus_SuccessOptimal:
             okStatus = .rendered
